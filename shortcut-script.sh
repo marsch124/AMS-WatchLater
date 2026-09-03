@@ -1,7 +1,13 @@
 # AMS WatchLater — the body of the "Add to WatchLater" shortcut.
 # Kept here so the shortcut can be rebuilt from source if it is ever lost.
 ENGINE="http://127.0.0.1:7821"
-APPDIR="$HOME/Documents/01 Leisure/30 App Development/AMS WatchLater"
+# Find the app folder without pinning its exact name, so it can be called
+# "AMS WatchLater", "AMS-WatchLater" or "AMS_WatchLater" without breaking.
+DEV="$HOME/Documents/01 Leisure/30 App Development"
+APPDIR=""
+for c in "$DEV"/*[Ww]atch*[Ll]ater; do
+	[ -f "$c/server.js" ] && APPDIR="$c" && break
+done
 LOG="$HOME/Library/Logs/AMS-WatchLater.log"
 
 URL=$(osascript <<'EOS' 2>/dev/null

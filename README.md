@@ -85,6 +85,10 @@ and TCC identifies apps by bundle id — so macOS could never grant stable permi
 `AESendMessage`. Both are ad-hoc signed with real ids, matching how *AMS Finance.app* is built. **Re-sign after
 any change to a bundle** (`build-apps.sh` does it), or the permission grant breaks.
 
+**The folder can be renamed.** The applets self-locate via `path to me`, and `shortcut-script.sh` globs for
+`*[Ww]atch*[Ll]ater` containing a `server.js` rather than pinning an exact folder name — so "AMS WatchLater",
+"AMS-WatchLater" and "AMS_WatchLater" all work. Do not reintroduce a hardcoded folder name.
+
 **The launcher must stay an AppleScript applet.** A bash-script `.app` gets silently TCC-denied for Documents
 with no prompt, ever.
 
