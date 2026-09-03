@@ -18,6 +18,11 @@ build () {
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bid" "$app/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Add :CFBundleName string $name" "$app/Contents/Info.plist" >/dev/null 2>&1 || true
   /usr/libexec/PlistBuddy -c "Set :NSAppleEventsUsageDescription AMS WatchLater reads the address of the page you are on, so it can save the video to your list." "$app/Contents/Info.plist"
+  # osacompile also bakes a generic icon into Assets.car and points
+  # CFBundleIconName at it, and macOS prefers that over the loose .icns —
+  # so the custom icon never shows. Remove both; AMS Finance.app has neither.
+  rm -f "$app/Contents/Resources/Assets.car"
+  /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$app/Contents/Info.plist" 2>/dev/null || true
   cp "$icns" "$app/Contents/Resources/applet.icns"
   # codesign occasionally refuses a freshly written bundle with "resource fork,
   # Finder information, or similar detritus not allowed". Clean and retry rather
