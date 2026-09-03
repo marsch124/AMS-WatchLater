@@ -13,6 +13,7 @@ A read-later list for YouTube. Mac only, no account, no sync, nothing uploaded.
 | **AMS WatchLater.app** | Opens the list. Starts the engine first if it is not running. |
 | **Add to WatchLater.app** | Keep in the Dock. One click saves the page you are on. |
 | **Add to WatchLater.shortcut** | Import once, then give it a key combination. Same thing, no mouse. |
+| **AMS WatchLater Engine.app** | A login item. Starts the engine quietly when the Mac starts, so nothing ever needs starting by hand. Opens no window. |
 
 ## Four ways to get a video in
 
@@ -88,6 +89,14 @@ any change to a bundle** (`build-apps.sh` does it), or the permission grant brea
 **The folder can be renamed.** The applets self-locate via `path to me`, and `shortcut-script.sh` globs for
 `*[Ww]atch*[Ll]ater` containing a `server.js` rather than pinning an exact folder name — so "AMS WatchLater",
 "AMS-WatchLater" and "AMS_WatchLater" all work. Do not reintroduce a hardcoded folder name.
+
+**The engine starts at login via an applet, not a LaunchAgent.** `AMS WatchLater Engine.app` is registered as
+a login item, mirroring `AMS Finance Engine.app`. A bare LaunchAgent has no bundle identity for macOS to hang a
+Documents permission on, so it would be denied silently.
+
+**Only /health and /version.json are readable cross-origin**, and only from the Main Hub's origins — the hub
+needs them for its version chip. Everything that changes the list rejects a request carrying a foreign Origin,
+so a random web page cannot add to or empty your list just by knowing the port.
 
 **The launcher must stay an AppleScript applet.** A bash-script `.app` gets silently TCC-denied for Documents
 with no prompt, ever.

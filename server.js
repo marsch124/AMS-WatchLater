@@ -271,6 +271,15 @@ async function addOne(store, rawUrl) {
 
 /* ---------- http ---------- */
 
+// AMS Main Hub reads /health to fill in this app's version chip, and it is
+// served from a different port, so those two answers alone are readable
+// cross-origin. Nothing that changes the list is.
+const HUB_ORIGINS = [
+  "http://localhost:7780", "http://127.0.0.1:7780",   // Finance engine serves the hub
+  "http://localhost:7794", "http://127.0.0.1:7794",   // the hub's own port
+  "https://marsch124.github.io",                       // the published copy
+];
+
 function send(res, code, body, type = "application/json; charset=utf-8") {
   res.writeHead(code, {
     "Content-Type": type,
@@ -293,6 +302,19 @@ function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
+  const origin = req.headers.origin || "";
+
+  if (HUB_ORIGINS.includes(origin) && (p === "/health" || p === "/version.json")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  // A page in the browser must not be able to add to or empty the list just by
+  // knowing the port. Requests carrying no Origin at all are the app's own
+  // tools — the Dock button, the shortcut, curl — and those are fine.
+  const WRITES = ["/api/add", "/api/update", "/api/delete"];
+  if (WRITES.includes(p) && origin && origin !== `http://localhost:${PORT}` && origin !== `http://127.0.0.1:${PORT}`) {
+    return send(res, 403, JSON.stringify({ ok: false, error: "origin not allowed" }));
+  }
 
   try {
     if (p === "/" || p === "/index.html") {

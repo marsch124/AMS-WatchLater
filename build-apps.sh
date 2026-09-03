@@ -34,4 +34,5 @@ build () {
 
 build "Add to WatchLater.app" add.applescript      com.ams.watchlater.add "Add to WatchLater" watchlater-add.icns
 build "AMS WatchLater.app"    launcher.applescript com.ams.watchlater.hub "AMS WatchLater"    watchlater.icns
+build "AMS WatchLater Engine.app" engine.applescript com.ams.watchlater.engine "AMS WatchLater Engine" watchlater.icns
 echo "Done. Both apps will ask for permission once on first launch."
