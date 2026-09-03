@@ -11,12 +11,12 @@ on run
 		do shell script "/bin/ls " & quoted form of appDir & " >/dev/null"
 	end try
 
-	set running to "no"
+	set engineUp to "no"
 	try
 		do shell script "/usr/bin/curl -s --max-time 1 " & engine & "/health >/dev/null && echo yes"
-		set running to "yes"
+		set engineUp to "yes"
 	end try
-	if running is not "yes" then
+	if engineUp is not "yes" then
 		do shell script "/usr/local/bin/node " & quoted form of (appDir & "/server.js") & " >> " & quoted form of logFile & " 2>&1 & for i in $(seq 1 40); do /usr/bin/curl -s --max-time 1 " & engine & "/health >/dev/null && exit 0; sleep 0.25; done; exit 0"
 	end if
 
