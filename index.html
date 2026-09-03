@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMS WatchLater</title>
+<script>
+// This app is served by its own engine on the Mac and must never be owned by a
+// service worker. One belonging to another AMS app was found squatting this
+// origin during development, serving its own cached page here instead of this
+// one. Any stray worker is removed on sight and the page reloads once, so what
+// loads is always the real app rather than something another app left behind.
+(function () {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistrations().then(function (regs) {
+    if (!regs.length) return;
+    Promise.all(regs.map(function (r) { return r.unregister(); })).then(function () {
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
+      }
+      if (!sessionStorage.getItem("wl-sw-purged")) {
+        sessionStorage.setItem("wl-sw-purged", "1");
+        location.reload();
+      }
+    });
+  });
+})();
+</script>
+
+<style>
+  :root{
+    --bg:#f4f1ea; --card:#fff; --ink:#23211d; --muted:#6b675f; --line:#e0dcd2;
+    --accent:#1d7a5f; --accent-soft:#e2efe9; --accent-ink:#12523f;
+    --amber:#9a6b12; --amber-soft:#f7edd8; --amber-line:#e3cd9b;
+    --shade:#efece4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1a18; --card:#242320; --ink:#eeebe4; --muted:#a09b91; --line:#38352f;
+      --accent:#5cc0a0; --accent-soft:#22332d; --accent-ink:#8ad9bd;
+      --amber:#d8ad5c; --amber-soft:#332d1f; --amber-line:#54452b;
+      --shade:#2b2926;
+    }
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 22px}
+  header{display:flex; align-items:baseline; gap:12px; padding:26px 0 18px; flex-wrap:wrap}
+  h1{margin:0; font-size:26px; font-weight:600; letter-spacing:-.2px}
+  .ver{font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:20px; padding:2px 9px}
+  .spacer{flex:1}
+  .tally{font-size:14px; color:var(--muted)}
+
+  .addbar{display:flex; gap:10px; align-items:stretch; margin-bottom:8px}
+  textarea#paste{
+    flex:1; min-height:44px; max-height:190px; resize:vertical; padding:11px 13px;
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--ink); background:var(--card);
+    border:1px solid var(--line); border-radius:10px;
+  }
+  textarea#paste:focus{outline:none; border-color:var(--accent)}
+  button{
+    font:15px/1 -apple-system,BlinkMacSystemFont,sans-serif; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:0 18px; cursor:pointer;
+  }
+  button:hover{border-color:var(--muted)}
+  button.go{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; min-width:88px}
+  button.go:hover{opacity:.9}
+  button:disabled{opacity:.5; cursor:default}
+  .hint{font-size:13px; color:var(--muted); margin:0 0 20px}
+
+  .filters{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:20px}
+  .filters .lab{font-size:14px; color:var(--muted); margin-right:2px}
+  .pill{
+    font-size:14px; padding:7px 14px; border-radius:9px; cursor:pointer;
+    background:var(--card); border:1px solid var(--line); color:var(--ink);
+  }
+  .pill .n{color:var(--muted); font-size:13px}
+  .pill:hover{border-color:var(--muted)}
+  .pill.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:500}
+  .pill.on .n{color:var(--accent)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:18px}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:13px;
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  .card.stale{border-color:var(--amber-line)}
+  .card.done{opacity:.62}
+  .thumb{
+    position:relative; display:block; aspect-ratio:16/9; background:var(--shade);
+    cursor:pointer; border:0; padding:0; width:100%; overflow:hidden;
+  }
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .thumb .noimg{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+    color:var(--muted);
+  }
+  .thumb .dur{
+    position:absolute; right:7px; bottom:7px; background:rgba(20,18,15,.86); color:#fff;
+    font-size:12px; font-weight:500; padding:2px 6px; border-radius:5px; letter-spacing:.2px;
+  }
+  .thumb .play{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity .12s;
+  }
+  .thumb:hover .play{opacity:1}
+  .thumb .play span{
+    width:52px; height:52px; border-radius:50%; background:rgba(20,18,15,.72);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .body{padding:11px 13px 12px; display:flex; flex-direction:column; flex:1; gap:5px}
+  .ttl{font-size:15px; font-weight:500; line-height:1.34; margin:0; cursor:pointer}
+  .ttl:hover{color:var(--accent)}
+  .chan{font-size:13px; color:var(--muted); margin:0}
+  .age{font-size:12px; color:var(--muted); margin:0; display:flex; align-items:center; gap:5px}
+  .card.stale .age{color:var(--amber)}
+  .row{display:flex; gap:6px; align-items:center; margin-top:auto; padding-top:9px}
+  .ico{
+    width:33px; height:33px; padding:0; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; flex:0 0 auto;
+  }
+  .ico.wide{width:auto; padding:0 11px; font-size:13px; gap:5px}
+  .askdur{display:flex; gap:5px; flex-wrap:wrap; padding-top:8px}
+  .askdur b{font-size:12px; color:var(--muted); font-weight:400; width:100%}
+  .askdur button{font-size:12px; padding:4px 9px; border-radius:7px}
+  .empty{text-align:center; color:var(--muted); padding:70px 20px; font-size:15px}
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--ink); color:var(--bg); padding:11px 20px; border-radius:10px;
+    font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:9; max-width:80vw;
+  }
+  .toast.show{opacity:1}
+  footer{margin-top:46px; border-top:1px solid var(--line); padding-top:18px}
+  details{margin-bottom:9px}
+  summary{cursor:pointer; font-size:14px; font-weight:500; padding:6px 0}
+  details div{font-size:14px; color:var(--muted); line-height:1.65; padding:4px 0 12px}
+  details b{color:var(--ink); font-weight:500}
+  kbd{
+    font:12px/1 ui-monospace,Menlo,monospace; background:var(--shade); color:var(--ink);
+    border:1px solid var(--line); border-radius:5px; padding:2px 5px;
+  }
+  svg{display:block}
+  .rel{border-left:2px solid var(--line); padding:0 0 2px 14px; margin:0 0 18px}
+  .rel:last-child{margin-bottom:4px}
+  .rel.now{border-left-color:var(--accent)}
+  .relhead{display:flex; align-items:baseline; gap:9px; margin-bottom:6px}
+  .relno{font-size:15px; font-weight:500; color:var(--ink)}
+  .rel.now .relno{color:var(--accent-ink)}
+  .reldate{font-size:12px; color:var(--muted)}
+  .reltag{font-size:11px; padding:1px 7px; border-radius:20px; background:var(--accent-soft); color:var(--accent-ink)}
+  .rel ul{margin:0 0 8px; padding-left:17px}
+  .rel li{margin-bottom:3px}
+  .why{background:var(--shade); border-radius:8px; padding:9px 11px; margin:0}
+  .why b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>WatchLater</h1>
+    <span class="ver" id="ver">v1.1</span>
+    <span class="spacer"></span>
+    <span class="tally" id="tally"></span>
+  </header>
+
+  <div class="addbar">
+    <textarea id="paste" rows="1" placeholder="Paste a YouTube link — or a whole pile of them, one per line"></textarea>
+    <button class="go" id="addbtn">Add</button>
+  </div>
+  <p class="hint">You can also press your <b>keyboard shortcut</b> while a video is open, click <b>Add to WatchLater</b> in the Dock, or drop links straight onto this window.</p>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden></div>
+
+  <footer>
+    <details>
+      <summary>How this works</summary>
+      <div>
+        <b>Four ways to get a video in.</b> They all end up in the same list, so use whichever is nearest to hand.
+        <br><br>
+        <b>1 — The keyboard shortcut.</b> With a video open, press your key combination. Nothing moves, nothing opens, the page stays exactly where it was; a notification tells you what was saved. This is the fastest way and the one to build the habit around.
+        <br><b>2 — The Dock button.</b> Click <b>Add to WatchLater</b> while a video is open. Same result, no key to remember.
+        <br><b>3 — Paste.</b> Drop one link or fifty into the box at the top, one per line, and press Add. This is how you empty a window full of tabs in one go.
+        <br><b>4 — Drag and drop.</b> Pull a link from anywhere onto this window.
+        <br><br>
+        <b>The row of buttons is the whole idea.</b> You almost never want to know what you saved on Tuesday. You want to know what fits in the twenty minutes you actually have. Click a time and the list shows only videos that fit inside it. <b>Everything</b> shows the lot. That one change is what turns a saved list into something you open.
+        <br><br>
+        <b>Lengths arrive on their own.</b> When a link comes in, the length is read straight off the YouTube page, here on this Mac. There is no account, no key and nothing to set up. If a video has been made private or taken down the length cannot be read, and rather than saving a blank card the app tells you it could not read the link. For anything that is not YouTube, the card asks you to tap a rough length so it still lands in the right time bucket.
+        <br><br>
+        <b>Nothing rots quietly.</b> Anything sitting untouched for three months turns amber and asks whether you still want it. <b>Keep</b> resets its clock for another three months; the bin removes it. Without this, a read-later list only ever grows, and a list that only grows is one you stop opening. That is what happened to every other one you have tried.
+        <br><br>
+        <b>Ticking one off.</b> The tick marks a video watched and takes it out of the list. <b>Watched</b> in the button row brings them back into view if you want to find something a second time.
+        <br><br>
+        <b>The engine.</b> A small program runs quietly in the background to do the lookups and hold the list. You never have to start it: the Dock button, the keyboard shortcut and the app all start it themselves if it is not already running. The first video of the day may take a second or two longer while it wakes up.
+      </div>
+    </details>
+    <details>
+      <summary>Your data</summary>
+      <div>
+        Everything lives in one file on this Mac — <b>watchlater.json</b>, in the AMS WatchLater folder. Thumbnails sit next to it in <b>thumbs</b>, so pictures still show with the internet off.
+        <br><br>
+        A dated copy is written into the <b>backups</b> folder every time the list changes, and the last fourteen days are kept. That copy <b>refuses to overwrite a fuller one</b> from the same day, so a bad moment cannot quietly replace a good list with an empty one. To go back, put a dated file in place of watchlater.json.
+        <br><br>
+        Nothing is uploaded anywhere and there is no account. The only thing that ever leaves this Mac is the lookup that fetches a video's title and length.
+      </div>
+    </details>
+    <details>
+      <summary>Version history</summary>
+      <div>
+
+        <div class="rel now">
+          <div class="relhead"><span class="relno">v1.1</span><span class="reldate">3 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li>A <b>keyboard shortcut</b> that saves the video you are watching, from anywhere.</li>
+            <li>Both apps now work out their own location instead of having a fixed path written into them.</li>
+            <li>This version history, and a fuller How this works.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> reaching for the Dock still breaks your attention — you have to find the icon and aim at it. A key combination does not, so saving a video costs nothing and you will actually do it while the thought is still there. The self-locating change means the folder can be moved or renamed without anything breaking, and no personal path sits inside the files.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.0</span><span class="reldate">3 September 2026</span></div>
+          <ul>
+            <li>One-click capture from the Dock, plus paste-many and drag-and-drop.</li>
+            <li>Title, channel, thumbnail and <b>real video length</b> fetched automatically, with no account or key.</li>
+            <li>The time-bucket row: 5 minutes, 20 minutes, an hour, everything.</li>
+            <li>Three-month aging nudge with <b>Keep</b>, and a watched list.</li>
+            <li>Thumbnails stored on this Mac, so the list keeps its pictures offline.</li>
+            <li>Dated backups that refuse to overwrite a fuller copy.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the reason videos got lost was never storage — it was that saving one took more effort than the video was worth in the moment, so you left a tab open instead and the tab became noise. Capture here costs one click, so the video gets saved. And because every video arrives with its real length, the list can answer the only question you ever actually ask it: what can I watch right now, in the time I have. The backups exist because a list you cannot trust is one you stop putting things into.</p>
+        </div>
+
+      </div>
+    </details>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BUCKETS = [
+  { key:"5",   label:"5 min",     max:5*60 },
+  { key:"20",  label:"20 min",    max:20*60 },
+  { key:"60",  label:"An hour",   max:60*60 },
+  { key:"all", label:"Everything",max:Infinity },
+];
+const STALE_DAYS = 90;
+
+let items = [];
+let filter = "all";
+let showWatched = false;
+
+const $ = (id) => document.getElementById(id);
+
+function fmtDur(s){
+  if (s == null) return null;
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
+           : `${m}:${String(sec).padStart(2,"0")}`;
+}
+function daysSince(iso){
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+function fmtAge(iso){
+  const d = daysSince(iso);
+  if (d <= 0) return "Saved today";
+  if (d === 1) return "Saved yesterday";
+  if (d < 14) return `Saved ${d} days ago`;
+  if (d < 60) return `Saved ${Math.floor(d/7)} weeks ago`;
+  return `Saved ${Math.floor(d/30)} months ago`;
+}
+function staleClock(it){
+  return daysSince(it.keptAt || it.savedAt);
+}
+function isStale(it){
+  return !it.watchedAt && staleClock(it) >= STALE_DAYS;
+}
+
+function icon(name){
+  const p = {
+    play:  '<path d="M8 5.4c0-.7.6-1 1.1-.7l8.4 5.9c.5.4.5 1.1 0 1.5l-8.4 5.9c-.5.3-1.1 0-1.1-.7z"/>',
+    tick:  '<path d="M5 12.6c1.9 1.4 3.4 2.9 4.6 4.6 2.2-4.6 5.1-8.3 8.8-11.2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
+    bin:   '<path d="M6 7.5c4.1-.5 8-.5 12 0M9.5 7.2c.1-1.2.2-1.9.4-2.2.6-.4 3.6-.4 4.2 0 .2.3.3 1 .4 2.2M7.3 8.4c.3 4.3.7 7.7 1 10.1.1.7.6 1.1 1.3 1.2 1.6.2 3.2.2 4.8 0 .7-.1 1.2-.5 1.3-1.2.4-2.4.7-5.8 1-10.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    clock: '<circle cx="12" cy="12.4" r="7.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8.3v4.3l2.9 1.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    glass: '<path d="M8 4.4c2.7-.4 5.3-.4 8 0M8 20.4c2.7.4 5.3.4 8 0M9.2 4.6c0 3.1.9 5.6 2.8 7.6-1.9 2.1-2.8 4.6-2.8 8M14.8 4.6c0 3.1-.9 5.6-2.8 7.6 1.9 2.1 2.8 4.6 2.8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    keep:  '<path d="M12 4.7c-1.4 3.6-3 5.4-6.4 6.1 3.1 2.6 4.8 5.3 5.4 8.5.8-3.4 2.7-6.1 6-8.5-3.3-.7-4.9-2.5-5-6.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    film:  '<rect x="3.6" y="6.2" width="16.8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 6.4v11.6M15.6 6.4v11.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  }[name];
+  return `<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
+}
+
+function visible(){
+  let list = items.filter((it) => (showWatched ? !!it.watchedAt : !it.watchedAt));
+  if (!showWatched && filter !== "all"){
+    const max = BUCKETS.find((b) => b.key === filter).max;
+    list = list.filter((it) => it.seconds != null && it.seconds <= max);
+  }
+  if (showWatched) list.sort((a,b) => (b.watchedAt||"").localeCompare(a.watchedAt||""));
+  else list.sort((a,b) => (isStale(b)?1:0)-(isStale(a)?1:0) || (b.savedAt||"").localeCompare(a.savedAt||""));
+  return list;
+}
+
+function renderFilters(){
+  const open = items.filter((it) => !it.watchedAt);
+  const done = items.length - open.length;
+  const f = $("filters");
+  f.textContent = "";
+
+  const lab = document.createElement("span");
+  lab.className = "lab";
+  lab.textContent = "I have";
+  f.append(lab);
+
+  for (const b of BUCKETS){
+    const n = b.max === Infinity
+      ? open.length
+      : open.filter((it) => it.seconds != null && it.seconds <= b.max).length;
+    const el = document.createElement("button");
+    el.className = "pill" + (!showWatched && filter === b.key ? " on" : "");
+    el.innerHTML = `${b.label} <span class="n">· ${n}</span>`;
+    el.onclick = () => { showWatched = false; filter = b.key; render(); };
+    f.append(el);
+  }
+
+  const sp = document.createElement("span");
+  sp.className = "spacer";
+  f.append(sp);
+
+  const w = document.createElement("button");
+  w.className = "pill" + (showWatched ? " on" : "");
+  w.innerHTML = `${icon("tick")}<span class="n"> Watched · ${done}</span>`;
+  w.style.display = "flex";
+  w.style.alignItems = "center";
+  w.style.gap = "5px";
+  w.onclick = () => { showWatched = !showWatched; render(); };
+  f.append(w);
+}
+
+// Titles and channel names come from YouTube, so they are placed with
+// textContent — never as markup.
+function card(it){
+  const el = document.createElement("div");
+  el.className = "card" + (isStale(it) ? " stale" : "") + (it.watchedAt ? " done" : "");
+
+  const thumb = document.createElement("button");
+  thumb.className = "thumb";
+  thumb.title = "Open on YouTube";
+  if (it.videoId){
+    const img = document.createElement("img");
+    img.src = `/thumbs/${it.videoId}.jpg`;
+    img.alt = "";
+    img.loading = "lazy";
+    img.onerror = () => { img.src = `https://i.ytimg.com/vi/${it.videoId}/hqdefault.jpg`; };
+    thumb.append(img);
+  } else {
+    const n = document.createElement("div");
+    n.className = "noimg";
+    n.innerHTML = icon("film");
+    thumb.append(n);
+  }
+  const play = document.createElement("div");
+  play.className = "play";
+  play.innerHTML = `<span style="color:#fff">${icon("play")}</span>`;
+  thumb.append(play);
+  if (it.seconds != null){
+    const d = document.createElement("span");
+    d.className = "dur";
+    d.textContent = fmtDur(it.seconds);
+    thumb.append(d);
+  }
+  thumb.onclick = () => open_(it);
+  el.append(thumb);
+
+  const body = document.createElement("div");
+  body.className = "body";
+
+  const t = document.createElement("p");
+  t.className = "ttl";
+  t.textContent = it.title;
+  t.onclick = () => open_(it);
+  body.append(t);
+
+  if (it.channel){
+    const c = document.createElement("p");
+    c.className = "chan";
+    c.textContent = it.channel;
+    body.append(c);
+  }
+
+  const a = document.createElement("p");
+  a.className = "age";
+  if (isStale(it)){
+    a.innerHTML = icon("glass");
+    a.append(` Sat here ${Math.floor(staleClock(it)/30)} months — still want it?`);
+  } else {
+    a.innerHTML = icon("clock");
+    a.append(" " + fmtAge(it.watchedAt ? it.watchedAt : it.savedAt).replace("Saved", it.watchedAt ? "Watched" : "Saved"));
+  }
+  body.append(a);
+
+  // A video whose length could not be read would never match a time bucket,
+  // so the card asks for a rough one rather than hiding from every filter.
+  if (it.seconds == null && !it.watchedAt){
+    const ask = document.createElement("div");
+    ask.className = "askdur";
+    const b = document.createElement("b");
+    b.textContent = "Length unknown — roughly?";
+    ask.append(b);
+    for (const [label, secs] of [["Short",4*60],["20 min",18*60],["Long",50*60]]){
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.onclick = (e) => { e.stopPropagation(); patch(it.id, { seconds: secs }); };
+      ask.append(btn);
+    }
+    body.append(ask);
+  }
+
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const openBtn = document.createElement("button");
+  openBtn.className = "ico wide";
+  openBtn.innerHTML = icon("play") + "<span>Watch</span>";
+  openBtn.style.display = "flex";
+  openBtn.onclick = () => open_(it);
+  row.append(openBtn);
+
+  const sp2 = document.createElement("span");
+  sp2.style.flex = "1";
+  row.append(sp2);
+
+  if (isStale(it)){
+    const keep = document.createElement("button");
+    keep.className = "ico";
+    keep.title = "Keep for another three months";
+    keep.innerHTML = icon("keep");
+    keep.onclick = () => patch(it.id, { keep: true });
+    row.append(keep);
+  }
+
+  const tick = document.createElement("button");
+  tick.className = "ico";
+  tick.title = it.watchedAt ? "Put back on the list" : "Mark as watched";
+  tick.innerHTML = icon("tick");
+  if (it.watchedAt){ tick.style.borderColor = "var(--accent)"; tick.style.color = "var(--accent)"; }
+  tick.onclick = () => patch(it.id, { watched: !it.watchedAt });
+  row.append(tick);
+
+  const del = document.createElement("button");
+  del.className = "ico";
+  del.title = "Remove";
+  del.innerHTML = icon("bin");
+  del.onclick = () => remove(it);
+  row.append(del);
+
+  body.append(row);
+  el.append(body);
+  return el;
+}
+
+function render(){
+  renderFilters();
+  const list = visible();
+  const g = $("grid");
+  g.textContent = "";
+  for (const it of list) g.append(card(it));
+
+  const open = items.filter((it) => !it.watchedAt).length;
+  $("tally").textContent = open ? `${open} to watch` : "";
+
+  const e = $("empty");
+  if (list.length){
+    e.hidden = true;
+  } else {
+    e.hidden = false;
+    e.textContent = showWatched
+      ? "Nothing ticked off yet."
+      : items.length
+        ? "Nothing that short on the list. Try a longer slot."
+        : "Paste a YouTube link above to start.";
+  }
+}
+
+let toastTimer;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function open_(it){
+  window.open(it.url, "_blank");
+}
+
+async function load(){
+  const r = await fetch("/api/list", { cache:"no-store" });
+  const d = await r.json();
+  items = d.items || [];
+  if (d.version) $("ver").textContent = "v" + d.version;
+  render();
+}
+
+async function patch(id, change){
+  await fetch("/api/update", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(Object.assign({ id }, change)),
+  });
+  await load();
+}
+
+async function remove(it){
+  if (!confirm(`Remove "${it.title}"?`)) return;
+  await fetch("/api/delete", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ id: it.id }),
+  });
+  await load();
+}
+
+async function add(text){
+  const urls = String(text || "")
+    .split(/[\s\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^(https?:\/\/|www\.|youtu)/i.test(s));
+  if (!urls.length){ toast("No links found in that."); return; }
+
+  const btn = $("addbtn");
+  btn.disabled = true;
+  btn.textContent = urls.length > 1 ? `0/${urls.length}` : "…";
+  try{
+    const r = await fetch("/api/add", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ urls }),
+    });
+    const d = await r.json();
+    $("paste").value = "";
+    await load();
+    const bits = [];
+    if (d.added.length) bits.push(`${d.added.length} added`);
+    if (d.dupes.length) bits.push(`${d.dupes.length} already on the list`);
+    if (d.failed.length) bits.push(`${d.failed.length} could not be read`);
+    toast(bits.join(" · ") || "Nothing to add.");
+  } catch(e){
+    toast("Could not reach the engine.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add";
+  }
+}
+
+$("addbtn").onclick = () => add($("paste").value);
+$("paste").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || !e.shiftKey)){
+    e.preventDefault();
+    add($("paste").value);
+  }
+});
+
+// Dropping a link anywhere on the window adds it.
+document.addEventListener("dragover", (e) => { e.preventDefault(); });
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+  if (text) add(text);
+});
+
+// Coming back to the window after adding from the Dock should show it.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+
+load();
+</script>
+</body>
+</html>

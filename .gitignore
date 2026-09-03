@@ -1,0 +1,13 @@
+# Your list and everything derived from it. The repository is PUBLIC —
+# these must never leave this Mac.
+watchlater.json
+watchlater.json.tmp
+backups/
+thumbs/
+
+# Built app bundles. They are code-signed binaries and git mangles them;
+# build-apps.sh rebuilds both from the .applescript files and the icons.
+*.app/
+
+# macOS clutter
+.DS_Store
