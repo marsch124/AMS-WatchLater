@@ -166,7 +166,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.1</span>
+    <span class="ver" id="ver">v1.2</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -175,7 +175,7 @@
     <textarea id="paste" rows="1" placeholder="Paste a YouTube link — or a whole pile of them, one per line"></textarea>
     <button class="go" id="addbtn">Add</button>
   </div>
-  <p class="hint">Or, with a video open in Safari, click the <b>plus icon</b> at the end of your Dock — that saves it without leaving the page. Links can also be dropped straight onto this window.</p>
+  <p class="hint">Or, with a video open in Safari, run <b>Add to WatchLater</b> from Raycast or Alfred — it saves the video without leaving the page. Links can also be dropped straight onto this window.</p>
 
   <div class="filters" id="filters"></div>
 
@@ -188,8 +188,8 @@
       <div>
         <b>Four ways to get a video in.</b> They all end up in the same list, so use whichever is nearest to hand.
         <br><br>
-        <b>1 — The plus icon in the Dock.</b> With a video open in Safari, click it. Nothing moves, nothing opens, the page stays exactly where it was; a notification tells you what was saved. This is the one to build the habit around.
-        <br><b>2 — A keyboard key, if you want one.</b> The same thing without reaching for the mouse. It is not set up yet: there is a file called <b>Add to WatchLater.shortcut</b> in the app folder — double-click it, add it, then give it a key combination in the Shortcuts app.
+        <b>1 — Add to WatchLater, from Raycast or Alfred.</b> With a video open in Safari, type its name and press Return. Nothing moves, nothing opens, the page stays exactly where it was; a notification tells you what was saved. This is the one to build the habit around.
+        <br><b>2 — A hotkey, if you want one.</b> Raycast can give any app a key combination in its own settings — pick <b>Add to WatchLater</b> there and press the keys you want. Nothing else to install.
         <br><b>3 — Paste.</b> Drop one link or fifty into the box at the top, one per line, and press Add. This is how you empty a window full of tabs in one go.
         <br><b>4 — Drag and drop.</b> Pull a link from anywhere onto this window.
         <br><br>
@@ -201,7 +201,7 @@
         <br><br>
         <b>Ticking one off.</b> The tick marks a video watched and takes it out of the list. <b>Watched</b> in the button row brings them back into view if you want to find something a second time.
         <br><br>
-        <b>The engine.</b> A small program runs quietly in the background to do the lookups and hold the list. You never have to start it: the Dock button, the keyboard shortcut and the app all start it themselves if it is not already running. The first video of the day may take a second or two longer while it wakes up.
+        <b>The engine.</b> A small program runs quietly in the background to do the lookups and hold the list. You never have to start it: it comes up when the Mac starts, and both apps start it themselves if it is ever not running. The first video of the day may take a second or two longer while it wakes up.
       </div>
     </details>
     <details>
@@ -219,7 +219,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.1</span><span class="reldate">3 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.2</span><span class="reldate">3 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li>Both apps now live in <b>Applications</b>, so Raycast, Alfred and Spotlight find them by name.</li>
+            <li>Neither app needs the Documents permission any more — only one Safari question for Add to WatchLater, once.</li>
+            <li>The separate keyboard-shortcut file is gone; a hotkey, if wanted, is set in Raycast.</li>
+            <li>Fixed: both apps failed with “Can’t set running to no” right after reading the Safari tab.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> you launch things by typing their name, not from the Dock — so the apps have to be where a launcher looks, under the name you would type. And the fewer permission questions and extra files there are, the fewer ways there are for it to feel like madness.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.1</span><span class="reldate">3 September 2026</span></div>
           <ul>
             <li>A <b>keyboard shortcut</b> that saves the video you are watching, from anywhere.</li>
             <li>Both apps now work out their own location instead of having a fixed path written into them.</li>

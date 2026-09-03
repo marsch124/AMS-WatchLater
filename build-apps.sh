@@ -40,4 +40,15 @@ build () {
 build "Add to WatchLater.app" add.applescript      com.ams.watchlater.add "Add to WatchLater" watchlater-add.icns
 build "AMS WatchLater.app"    launcher.applescript com.ams.watchlater.hub "AMS WatchLater"    watchlater.icns
 build "AMS WatchLater Engine.app" engine.applescript com.ams.watchlater.engine "AMS WatchLater Engine" watchlater.icns
-echo "Done. Both apps will ask for permission once on first launch."
+
+# The two apps a person launches go to ~/Applications, where Raycast, Alfred
+# and Spotlight rank them as apps. They carry no path, so they work from there.
+# The Engine stays here: it is a login item and must sit next to server.js.
+mkdir -p "$HOME/Applications"
+for app in "Add to WatchLater.app" "AMS WatchLater.app"; do
+  rm -rf "$HOME/Applications/$app"
+  ditto "$app" "$HOME/Applications/$app"
+  rm -rf "$app"
+  echo "installed ~/Applications/$app"
+done
+echo "Done. Add to WatchLater asks about Safari once; the Engine asks about Documents once."
