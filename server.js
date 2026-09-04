@@ -16,7 +16,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.3";
+const APP_VERSION = "1.4";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -79,6 +79,25 @@ function saveStore(data) {
   const tmp = STORE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   fs.renameSync(tmp, STORE);
+}
+
+// The bin is undoable for a few seconds, so removing a video first only marks
+// it. Nothing is really dropped until the window has passed, which means even
+// closing the page mid-undo cannot lose one. Marked items are invisible to the
+// list; a later write sweeps up the ones whose window has expired.
+const TOMBSTONE_MS = 10 * 60 * 1000;
+
+function liveItems(store) {
+  return store.items.filter((it) => !it.deletedAt);
+}
+
+function purgeDeleted(store) {
+  const cutoff = Date.now() - TOMBSTONE_MS;
+  const before = store.items.length;
+  store.items = store.items.filter(
+    (it) => !it.deletedAt || new Date(it.deletedAt).getTime() > cutoff
+  );
+  return store.items.length !== before;
 }
 
 /* ---------- YouTube ---------- */
@@ -247,6 +266,13 @@ async function addOne(store, rawUrl) {
   const existing = store.items.find((it) =>
     id ? it.videoId === id : it.url === url
   );
+  // Saving a video that was binned a minute ago has to bring it back rather
+  // than be waved away as a duplicate of something invisible.
+  if (existing && existing.deletedAt) {
+    existing.deletedAt = null;
+    existing.savedAt = new Date().toISOString();
+    return { ok: true, item: existing };
+  }
   if (existing) return { ok: true, duplicate: true, item: existing };
 
   const meta = id ? await youtubeMeta(id) : await genericMeta(url);
@@ -263,6 +289,8 @@ async function addOne(store, rawUrl) {
     savedAt: new Date().toISOString(),
     watchedAt: null,
     keptAt: null,
+    pinnedAt: null,
+    deletedAt: null,
     note: "",
   };
   store.items.unshift(item);
@@ -343,7 +371,7 @@ const server = http.createServer(async (req, res) => {
       // version happened to be stamped in the data file the last time it was
       // written — otherwise a fresh release keeps displaying the old number.
       const store = loadStore();
-      return send(res, 200, JSON.stringify({ ...store, version: APP_VERSION }));
+      return send(res, 200, JSON.stringify({ version: APP_VERSION, items: liveItems(store) }));
     }
 
     // The capture endpoint. "Add to WatchLater.app" and the Shortcut both
@@ -366,6 +394,7 @@ const server = http.createServer(async (req, res) => {
       if (!urls.length) return send(res, 400, JSON.stringify({ ok: false, error: "no url" }));
 
       const store = loadStore();
+      purgeDeleted(store);
       const added = [];
       const dupes = [];
       const failed = [];
@@ -395,7 +424,7 @@ const server = http.createServer(async (req, res) => {
       return send(
         res,
         200,
-        JSON.stringify({ ok: true, added, dupes, failed, count: store.items.length })
+        JSON.stringify({ ok: true, added, dupes, failed, count: liveItems(store).length })
       );
     }
 
@@ -408,6 +437,8 @@ const server = http.createServer(async (req, res) => {
       if ("keep" in j) item.keptAt = j.keep ? new Date().toISOString() : null;
       if ("seconds" in j) item.seconds = j.seconds == null ? null : +j.seconds;
       if ("note" in j) item.note = String(j.note || "").slice(0, 500);
+      if ("pin" in j) item.pinnedAt = j.pin ? new Date().toISOString() : null;
+      if (j.restore) item.deletedAt = null;
       saveStore(store);
       return send(res, 200, JSON.stringify({ ok: true, item }));
     }
@@ -415,10 +446,11 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/delete" && req.method === "POST") {
       const j = JSON.parse(await readBody(req));
       const store = loadStore();
-      const before = store.items.length;
-      store.items = store.items.filter((it) => it.id !== j.id);
-      if (store.items.length !== before) saveStore(store);
-      return send(res, 200, JSON.stringify({ ok: true, count: store.items.length }));
+      const swept = purgeDeleted(store);
+      const item = store.items.find((it) => it.id === j.id);
+      if (item && !item.deletedAt) item.deletedAt = new Date().toISOString();
+      if (item || swept) saveStore(store);
+      return send(res, 200, JSON.stringify({ ok: true, count: liveItems(store).length }));
     }
 
     return send(res, 404, JSON.stringify({ ok: false, error: "not found" }));
@@ -429,5 +461,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
+  const store = loadStore();
+  if (purgeDeleted(store)) saveStore(store);
   console.log(`AMS WatchLater v${APP_VERSION} — http://localhost:${PORT}`);
 });

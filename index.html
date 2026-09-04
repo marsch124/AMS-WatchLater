@@ -88,10 +88,12 @@
 
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:14px}
   .card{
+    position:relative;
     background:var(--card); border:1px solid var(--line); border-radius:13px;
     overflow:hidden; display:flex; flex-direction:column;
   }
   .card.stale{border-color:var(--amber-line)}
+  .card.pinned{border-color:var(--accent)}
   .card.done{opacity:.62}
   .thumb{
     position:relative; display:block; aspect-ratio:16/9; background:var(--shade);
@@ -115,10 +117,36 @@
     width:52px; height:52px; border-radius:50%; background:rgba(20,18,15,.72);
     display:flex; align-items:center; justify-content:center;
   }
+  .pin{
+    position:absolute; right:7px; top:7px; width:27px; height:27px; padding:0;
+    border:0; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,18,15,.68); color:#fff; cursor:pointer;
+    opacity:0; transition:opacity .12s;
+  }
+  .card:hover .pin{opacity:1}
+  .pin:hover{background:rgba(20,18,15,.92); border:0}
+  .pin.on{opacity:1; background:var(--accent)}
+  .pin.on:hover{background:var(--accent); opacity:.85}
+
   .body{padding:9px 11px 10px; display:flex; flex-direction:column; flex:1; gap:4px}
   .ttl{font-size:14px; font-weight:500; line-height:1.34; margin:0; cursor:pointer}
   .ttl:hover{color:var(--accent)}
   .chan{font-size:13px; color:var(--muted); margin:0}
+  .note{
+    font-size:12.5px; line-height:1.4; color:var(--muted); margin:0; cursor:text;
+    display:flex; gap:5px; align-items:flex-start;
+  }
+  .note span{min-width:0; overflow-wrap:anywhere}
+  .note svg{flex:0 0 auto; margin-top:2px; opacity:.75}
+  .note.blank{opacity:0; transition:opacity .12s}
+  .card:hover .note.blank{opacity:.75}
+  .noteedit{
+    width:100%; margin:0; padding:5px 7px; resize:none;
+    font:12.5px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--ink); background:var(--bg);
+    border:1px solid var(--accent); border-radius:7px;
+  }
+  .noteedit:focus{outline:none}
   .age{font-size:12px; color:var(--muted); margin:0; display:flex; align-items:center; gap:5px}
   .card.stale .age{color:var(--amber)}
   .row{display:flex; gap:6px; align-items:center; margin-top:auto; padding-top:7px}
@@ -130,6 +158,7 @@
   .askdur{display:flex; gap:5px; flex-wrap:wrap; padding-top:8px}
   .askdur b{font-size:12px; color:var(--muted); font-weight:400; width:100%}
   .askdur button{font-size:12px; padding:4px 9px; border-radius:7px}
+  .total{font-size:13px; color:var(--muted); padding-left:4px; white-space:nowrap}
   .empty{text-align:center; color:var(--muted); padding:70px 20px; font-size:15px}
   .toast{
     position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
@@ -137,6 +166,13 @@
     font-size:14px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:9; max-width:80vw;
   }
   .toast.show{opacity:1}
+  .toast.act{pointer-events:auto}
+  .toast .undo{
+    margin-left:15px; padding:0; border:0; background:none; cursor:pointer;
+    color:var(--bg); font:500 14px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+    text-decoration:underline; text-underline-offset:3px;
+  }
+  .toast .undo:hover{opacity:.75; border:0}
   footer{margin-top:46px; border-top:1px solid var(--line); padding-top:18px}
   details{margin-bottom:9px}
   summary{cursor:pointer; font-size:14px; font-weight:500; padding:6px 0}
@@ -166,7 +202,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.3</span>
+    <span class="ver" id="ver">v1.4</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -195,11 +231,19 @@
         <br><br>
         <b>The row of buttons is the whole idea.</b> You almost never want to know what you saved on Tuesday. You want to know what fits in the twenty minutes you actually have. Click a time and the list shows only videos that fit inside it. <b>Everything</b> shows the lot. That one change is what turns a saved list into something you open.
         <br><br>
+        <b>The row also tells you how much is there.</b> Beside the times you get, for whatever is showing, something like <b>9 videos · 2 h 40 min</b>. It is the difference between “a few things saved” and “that is a whole evening” — and it is usually the sentence that makes you either pick one now or clear a couple out. A <b>+</b> at the end means one of them has no length yet, so the real total is a little higher.
+        <br><br>
+        <b>A line about why you saved it.</b> Under the title of every card there is room for one line in your own words — <i>for the trip</i>, <i>the bit about sleep</i>, <i>watch with Lisa</i>. Click it and type; Return saves, Escape forgets it. Three weeks later the title alone rarely tells you what you were after, and that is exactly when a video gets skipped over instead of watched. It is one line on the card on purpose — nothing here deserves a screen of its own.
+        <br><br>
+        <b>Pinning.</b> The pin in the corner of a picture holds that video at the top of the list, above everything else, until you press it again. For the one or two you have actually decided to watch next, rather than the pile you might.
+        <br><br>
         <b>Lengths arrive on their own.</b> When a link comes in, the length is read straight off the YouTube page, here on this Mac. There is no account, no key and nothing to set up. If a video has been made private or taken down the length cannot be read, and rather than saving a blank card the app tells you it could not read the link. For anything that is not YouTube, the card asks you to tap a rough length so it still lands in the right time bucket.
         <br><br>
         <b>Nothing rots quietly.</b> Anything sitting untouched for three months turns amber and asks whether you still want it. <b>Keep</b> resets its clock for another three months; the bin removes it. Without this, a read-later list only ever grows, and a list that only grows is one you stop opening. That is what happened to every other one you have tried.
         <br><br>
         <b>Ticking one off.</b> The tick marks a video watched and takes it out of the list. <b>Watched</b> in the button row brings them back into view if you want to find something a second time.
+        <br><br>
+        <b>Nothing asks “are you sure”.</b> Tick something by mistake, or bin the wrong card, and a small message appears at the bottom with <b>Undo</b> for five seconds. A question you have to answer every single time stops being read after the first week and catches nothing; five seconds of undo actually does. While that offer stands the video is only marked, not gone — so even closing this window mid-undo cannot lose it.
         <br><br>
         <b>The engine.</b> A small program runs quietly in the background to do the lookups and hold the list. You never have to start it: it comes up when the Mac starts, and both apps start it themselves if it is ever not running. The first video of the day may take a second or two longer while it wakes up.
       </div>
@@ -219,7 +263,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.3</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.4</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>How much is in front of you</b> — the button row now says <b>9 videos · 2 h 40 min</b> for whatever is showing.</li>
+            <li><b>A note on each card</b> — one line, in your words, on why you saved it. Click under the title and type.</li>
+            <li><b>Pin to the top</b> — the pin on a picture holds that video above everything else until you unpin it.</li>
+            <li><b>Undo</b> — five seconds to take back a tick or a bin. The “are you sure” question is gone.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the list had grown past the point where the picture alone told you what a video was for, and past the point where you could tell at a glance whether it was ten minutes of choosing or a whole evening. The note carries the reason you saved it, the total carries the size of the pile, and the pin lets you say “this one, next” instead of deciding again every time you open it. Undo is there because a list you can damage by mis-clicking is one you start handling carefully — and careful is slow, so you stop using it. Nothing you press here can cost you anything now.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.3</span><span class="reldate">4 September 2026</span></div>
           <ul>
             <li>Cards a tad smaller, so more of the list fits on screen at once.</li>
           </ul>
@@ -279,6 +334,10 @@ const STALE_DAYS = 90;
 let items = [];
 let filter = "all";
 let showWatched = false;
+// A note being typed must never be swept away by a background reload — the
+// window regaining focus reloads the list, and that would wipe the box
+// mid-sentence.
+let editing = 0;
 
 const $ = (id) => document.getElementById(id);
 
@@ -299,6 +358,25 @@ function fmtAge(iso){
   if (d < 60) return `Saved ${Math.floor(d/7)} weeks ago`;
   return `Saved ${Math.floor(d/30)} months ago`;
 }
+// "9 videos · 2 h 40 min" — what is actually in front of you right now. A "+"
+// means something in there has no length, so the real total is a little more.
+function fmtTotal(list){
+  const n = list.length;
+  const videos = `${n} video${n === 1 ? "" : "s"}`;
+  const known = list.filter((it) => it.seconds != null);
+  const secs = known.reduce((sum, it) => sum + it.seconds, 0);
+  if (!secs) return videos;
+  const mins = Math.round(secs / 60);
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const time = h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
+  return `${videos} · ${time}${known.length < n ? " +" : ""}`;
+}
+
+function short(t, n = 40){
+  t = String(t || "");
+  return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
+}
+
 function staleClock(it){
   return daysSince(it.keptAt || it.savedAt);
 }
@@ -306,7 +384,7 @@ function isStale(it){
   return !it.watchedAt && staleClock(it) >= STALE_DAYS;
 }
 
-function icon(name){
+function icon(name, size = 17){
   const p = {
     play:  '<path d="M8 5.4c0-.7.6-1 1.1-.7l8.4 5.9c.5.4.5 1.1 0 1.5l-8.4 5.9c-.5.3-1.1 0-1.1-.7z"/>',
     tick:  '<path d="M5 12.6c1.9 1.4 3.4 2.9 4.6 4.6 2.2-4.6 5.1-8.3 8.8-11.2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -315,8 +393,10 @@ function icon(name){
     glass: '<path d="M8 4.4c2.7-.4 5.3-.4 8 0M8 20.4c2.7.4 5.3.4 8 0M9.2 4.6c0 3.1.9 5.6 2.8 7.6-1.9 2.1-2.8 4.6-2.8 8M14.8 4.6c0 3.1-.9 5.6-2.8 7.6 1.9 2.1 2.8 4.6 2.8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
     keep:  '<path d="M12 4.7c-1.4 3.6-3 5.4-6.4 6.1 3.1 2.6 4.8 5.3 5.4 8.5.8-3.4 2.7-6.1 6-8.5-3.3-.7-4.9-2.5-5-6.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
     film:  '<rect x="3.6" y="6.2" width="16.8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 6.4v11.6M15.6 6.4v11.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    pin:   '<path d="M9 4.1c2-.5 4-.5 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.3 4.5c.3 2.6-.5 4.7-2.4 6.3 2.8.7 5.5.7 8.2 0-1.9-1.6-2.7-3.7-2.4-6.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.9 11.4c0 3.2-.2 5.9-.5 8.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    pencil:'<path d="M4.7 19.3c.3-1.7.7-3 1.2-3.9L15.6 5.4c.6-.6 1.5-.6 2.1 0l.9.9c.6.6.6 1.5 0 2.1L8.6 18.1c-.9.5-2.2.9-3.9 1.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   }[name];
-  return `<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
 }
 
 function visible(){
@@ -325,12 +405,22 @@ function visible(){
     const max = BUCKETS.find((b) => b.key === filter).max;
     list = list.filter((it) => it.seconds != null && it.seconds <= max);
   }
-  if (showWatched) list.sort((a,b) => (b.watchedAt||"").localeCompare(a.watchedAt||""));
-  else list.sort((a,b) => (isStale(b)?1:0)-(isStale(a)?1:0) || (b.savedAt||"").localeCompare(a.savedAt||""));
+  if (showWatched){
+    list.sort((a,b) => (b.watchedAt||"").localeCompare(a.watchedAt||""));
+  } else {
+    // Pinned videos sit above everything, newest pin at the very top; the
+    // three-month nudge still floats the rest of the old ones up.
+    list.sort((a,b) => {
+      const pa = a.pinnedAt ? 1 : 0, pb = b.pinnedAt ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      if (pa) return (b.pinnedAt||"").localeCompare(a.pinnedAt||"");
+      return (isStale(b)?1:0)-(isStale(a)?1:0) || (b.savedAt||"").localeCompare(a.savedAt||"");
+    });
+  }
   return list;
 }
 
-function renderFilters(){
+function renderFilters(list){
   const open = items.filter((it) => !it.watchedAt);
   const done = items.length - open.length;
   const f = $("filters");
@@ -352,6 +442,11 @@ function renderFilters(){
     f.append(el);
   }
 
+  const tot = document.createElement("span");
+  tot.className = "total";
+  tot.textContent = list.length ? "· " + fmtTotal(list) : "";
+  f.append(tot);
+
   const sp = document.createElement("span");
   sp.className = "spacer";
   f.append(sp);
@@ -370,7 +465,8 @@ function renderFilters(){
 // textContent — never as markup.
 function card(it){
   const el = document.createElement("div");
-  el.className = "card" + (isStale(it) ? " stale" : "") + (it.watchedAt ? " done" : "");
+  el.className = "card" + (isStale(it) ? " stale" : "") +
+    (it.pinnedAt ? " pinned" : "") + (it.watchedAt ? " done" : "");
 
   const thumb = document.createElement("button");
   thumb.className = "thumb";
@@ -401,6 +497,18 @@ function card(it){
   thumb.onclick = () => open_(it);
   el.append(thumb);
 
+  // Deliberately a sibling of the picture rather than a button inside a
+  // button: it only looks like it sits on the thumbnail.
+  const pin = document.createElement("button");
+  pin.className = "pin" + (it.pinnedAt ? " on" : "");
+  pin.title = it.pinnedAt ? "Unpin" : "Pin to the top";
+  pin.innerHTML = icon("pin", 15);
+  pin.onclick = (e) => {
+    e.stopPropagation();
+    patch(it.id, { pin: !it.pinnedAt });
+  };
+  el.append(pin);
+
   const body = document.createElement("div");
   body.className = "body";
 
@@ -416,6 +524,11 @@ function card(it){
     c.textContent = it.channel;
     body.append(c);
   }
+
+  // One line, not a screen: why this was worth saving.
+  const note = document.createElement("p");
+  paintNote(note, it);
+  body.append(note);
 
   const a = document.createElement("p");
   a.className = "age";
@@ -473,7 +586,14 @@ function card(it){
   tick.title = it.watchedAt ? "Put back on the list" : "Mark as watched";
   tick.innerHTML = icon("tick");
   if (it.watchedAt){ tick.style.borderColor = "var(--accent)"; tick.style.color = "var(--accent)"; }
-  tick.onclick = () => patch(it.id, { watched: !it.watchedAt });
+  tick.onclick = async () => {
+    const was = !!it.watchedAt;
+    await patch(it.id, { watched: !was });
+    toast(
+      was ? "Back on the list — " + short(it.title) : "Ticked off — " + short(it.title),
+      () => patch(it.id, { watched: was })
+    );
+  };
   row.append(tick);
 
   const del = document.createElement("button");
@@ -488,9 +608,57 @@ function card(it){
   return el;
 }
 
+function paintNote(node, it){
+  node.className = "note" + (it.note ? "" : " blank");
+  node.title = it.note ? "Change this note" : "Add a note";
+  node.textContent = "";
+  const ic = document.createElement("span");
+  ic.innerHTML = icon("pencil", 12);
+  node.append(ic);
+  const tx = document.createElement("span");
+  tx.textContent = it.note || "Why did you save this?";
+  node.append(tx);
+  node.onclick = () => editNote(node, it);
+}
+
+// Return saves, Escape throws the change away, clicking elsewhere saves —
+// which is what everything else on the Mac does.
+function editNote(node, it){
+  const ta = document.createElement("textarea");
+  ta.className = "noteedit";
+  ta.rows = 2;
+  ta.maxLength = 500;
+  ta.placeholder = "Why did you save this?";
+  ta.value = it.note || "";
+  node.replaceWith(ta);
+  editing++;
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  let closed = false;
+  const finish = (save) => {
+    if (closed) return;
+    closed = true;
+    editing--;
+    const val = ta.value.trim();
+    if (save && val !== (it.note || "")){
+      it.note = val;
+      patch(it.id, { note: val });
+    } else {
+      paintNote(node, it);
+      ta.replaceWith(node);
+    }
+  };
+  ta.onblur = () => finish(true);
+  ta.onkeydown = (e) => {
+    if (e.key === "Escape"){ e.preventDefault(); finish(false); }
+    if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); ta.blur(); }
+  };
+}
+
 function render(){
-  renderFilters();
   const list = visible();
+  renderFilters(list);
   const g = $("grid");
   g.textContent = "";
   for (const it of list) g.append(card(it));
@@ -512,12 +680,24 @@ function render(){
 }
 
 let toastTimer;
-function toast(msg){
+function toast(msg, action){
   const t = $("toast");
   t.textContent = msg;
+  t.classList.toggle("act", !!action);
+  if (action){
+    const b = document.createElement("button");
+    b.className = "undo";
+    b.textContent = "Undo";
+    b.onclick = () => {
+      clearTimeout(toastTimer);
+      t.classList.remove("show", "act");
+      action();
+    };
+    t.append(b);
+  }
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  toastTimer = setTimeout(() => t.classList.remove("show", "act"), action ? 5000 : 2600);
 }
 
 function open_(it){
@@ -541,14 +721,17 @@ async function patch(id, change){
   await load();
 }
 
+// No "are you sure". A question you answer every time stops being read; five
+// seconds of Undo costs nothing and actually catches the mistake. The engine
+// only marks the video, so nothing is really gone while the offer stands.
 async function remove(it){
-  if (!confirm(`Remove "${it.title}"?`)) return;
   await fetch("/api/delete", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ id: it.id }),
   });
   await load();
+  toast("Removed — " + short(it.title), () => patch(it.id, { restore: true }));
 }
 
 async function add(text){
@@ -600,7 +783,9 @@ document.addEventListener("drop", (e) => {
 });
 
 // Coming back to the window after adding from the Dock should show it.
-document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && !editing) load();
+});
 
 load();
 </script>
