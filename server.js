@@ -16,7 +16,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.7";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -69,6 +69,53 @@ function writeBackup(data) {
   } catch (e) {
     console.error("backup failed:", e.message);
   }
+}
+
+// A copy he asks for by hand gets its own timestamped name and never touches
+// the daily one, so pressing the button can only ever ADD a safety net — it can
+// never overwrite a good copy with a worse one. See the daily rule above.
+function manualBackup(data, why) {
+  const now = new Date().toISOString();
+  const base = `watchlater-${now.slice(0, 10)}-${now.slice(11, 19).replace(/:/g, "")}${
+    why ? "-" + why : ""
+  }`;
+  let file = base + ".json";
+  let n = 1;
+  while (fs.existsSync(path.join(BACKUPS, file))) file = `${base}-${++n}.json`;
+  fs.writeFileSync(path.join(BACKUPS, file), JSON.stringify(data, null, 2));
+
+  const mine = fs
+    .readdirSync(BACKUPS)
+    .filter((f) => /^watchlater-\d{4}-\d{2}-\d{2}-\d{6}(-[a-z]+)?(-\d+)?\.json$/.test(f))
+    .sort();
+  for (const old of mine.slice(0, Math.max(0, mine.length - 10))) {
+    fs.unlinkSync(path.join(BACKUPS, old));
+  }
+  return { file, count: data.items.length };
+}
+
+const BACKUP_NAME = /^watchlater-\d{4}-\d{2}-\d{2}(-\d{6})?(-[a-z]+)?(-\d+)?\.json$/;
+
+function listBackups() {
+  const out = [];
+  for (const f of fs.readdirSync(BACKUPS)) {
+    if (!BACKUP_NAME.test(f)) continue;
+    try {
+      const st = fs.statSync(path.join(BACKUPS, f));
+      const d = JSON.parse(fs.readFileSync(path.join(BACKUPS, f), "utf8"));
+      if (!Array.isArray(d.items)) continue;
+      out.push({
+        file: f,
+        count: d.items.filter((it) => !it.deletedAt).length,
+        bytes: st.size,
+        at: st.mtime.toISOString(),
+        manual: /-\d{6}(-[a-z]+)?(-\d+)?\.json$/.test(f),
+      });
+    } catch (e) {
+      /* an unreadable file is simply not offered */
+    }
+  }
+  return out.sort((a, b) => b.file.localeCompare(a.file));
 }
 
 // Write to a temp file and rename, so a crash mid-write cannot leave a
@@ -152,7 +199,7 @@ function isoToSeconds(iso) {
   return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
 }
 
-async function youtubeMeta(id) {
+async function youtubeMeta(id, hint) {
   const watch = `https://www.youtube.com/watch?v=${id}`;
   const meta = { videoId: id, url: watch, seconds: null, title: null, channel: null };
 
@@ -166,6 +213,13 @@ async function youtubeMeta(id) {
     meta.channel = j.author_name || null;
   } catch (e) {
     /* fall through to the page scrape below */
+  }
+
+  // A length already read off a playlist page makes the watch page — by far the
+  // heaviest fetch here — unnecessary.
+  if (hint && hint.seconds != null) {
+    meta.seconds = hint.seconds;
+    if (meta.title) return meta;
   }
 
   // The watch page is the only keyless source of the duration.
@@ -251,9 +305,96 @@ async function genericMeta(url) {
   return meta;
 }
 
+/* ---------- keeping a card true ---------- */
+
+// Titles get changed, videos get made private, thumbnails get replaced. Asking
+// YouTube again either brings the card up to date or marks it as gone — and a
+// video that has gone is flagged rather than quietly deleted, because deciding
+// that is his.
+async function refreshOne(item) {
+  if (!item.videoId) return "skipped";
+  const meta = await youtubeMeta(item.videoId);
+  item.checkedAt = new Date().toISOString();
+  if (!meta.title) {
+    item.goneAt = item.goneAt || new Date().toISOString();
+    return "gone";
+  }
+  item.goneAt = null;
+  item.title = meta.title;
+  if (meta.channel) item.channel = meta.channel;
+  if (meta.seconds != null) item.seconds = meta.seconds;
+  try {
+    fs.rmSync(path.join(THUMBS, `${item.videoId}.jpg`), { force: true });
+  } catch (e) {
+    /* an old picture that will not budge is not worth failing over */
+  }
+  await cacheThumb(item.videoId);
+  return "updated";
+}
+
 /* ---------- adding ---------- */
 
-async function addOne(store, rawUrl) {
+// A playlist link is one link that means fifty. oEmbed knows nothing about
+// playlists, but the playlist PAGE lists them, and Node can read it — the same
+// reason this app has an engine at all.
+const PLAYLIST_MAX = 60;
+
+function playlistId(url) {
+  const m = url.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function clockToSeconds(t) {
+  const parts = String(t).split(":").map(Number);
+  if (!parts.length || parts.some((n) => !Number.isFinite(n))) return null;
+  return parts.reduce((n, x) => n * 60 + x, 0);
+}
+
+// Each row of the playlist page carries the video's id AND the little duration
+// badge, so ONE page read replaces a one-megabyte watch page per video. That is
+// the difference between a sixty-video playlist landing in half a minute and in
+// six — measured, not guessed.
+async function playlistVideos(listId) {
+  const html = (
+    await get(`https://www.youtube.com/playlist?list=${encodeURIComponent(listId)}`)
+  ).toString("utf8");
+
+  const out = [];
+  const seen = new Set();
+  const rows = [
+    ...html.matchAll(/"contentId":"([A-Za-z0-9_-]{11})","contentType":"LOCKUP_CONTENT_TYPE_VIDEO"/g),
+  ];
+  // The badge comes about ten thousand characters BEFORE its own row's id, so a
+  // row's length is the LAST one between the previous row and this one. Taking
+  // the first badge after the id instead hands every video the next one's
+  // length — which was silently true here until the numbers were checked
+  // against a known-good run. A row with no badge at all (a live stream, say)
+  // simply finds none in its stretch and keeps a null.
+  for (let i = 0; i < rows.length && out.length < PLAYLIST_MAX; i++) {
+    const id = rows[i][1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const from = i > 0 ? rows[i - 1].index : 0;
+    const stretch = html.slice(from, rows[i].index);
+    const badges = [...stretch.matchAll(/"text":"(\d{1,2}:\d{2}(?::\d{2})?)"/g)];
+    const badge = badges.length ? badges[badges.length - 1][1] : null;
+    out.push({ id, seconds: badge ? clockToSeconds(badge) : null });
+  }
+
+  // A page built some other way: fall back to every video id on it. Lengths then
+  // come from each video's own page, the slow way, as they always did.
+  if (!out.length) {
+    for (const m of html.matchAll(/"videoId":"([A-Za-z0-9_-]{11})"/g)) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      out.push({ id: m[1], seconds: null });
+      if (out.length === PLAYLIST_MAX) break;
+    }
+  }
+  return out;
+}
+
+async function addOne(store, rawUrl, hint) {
   let url = String(rawUrl || "").trim();
   if (!url) return { ok: false, reason: "empty" };
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
@@ -275,7 +416,7 @@ async function addOne(store, rawUrl) {
   }
   if (existing) return { ok: true, duplicate: true, item: existing };
 
-  const meta = id ? await youtubeMeta(id) : await genericMeta(url);
+  const meta = id ? await youtubeMeta(id, hint) : await genericMeta(url);
   if (id && !meta.title) return { ok: false, reason: "unavailable" };
   if (id) await cacheThumb(id);
 
@@ -293,6 +434,8 @@ async function addOne(store, rawUrl) {
     deletedAt: null,
     startedAt: null,
     answeredAt: null,
+    checkedAt: null,
+    goneAt: null,
     tags: [],
     note: "",
   };
@@ -359,7 +502,7 @@ const server = http.createServer(async (req, res) => {
   // A page in the browser must not be able to add to or empty the list just by
   // knowing the port. Requests carrying no Origin at all are the app's own
   // tools — the Dock button, the shortcut, curl — and those are fine.
-  const WRITES = ["/api/add", "/api/update", "/api/delete"];
+  const WRITES = ["/api/add", "/api/update", "/api/delete", "/api/backup", "/api/restore", "/api/refresh"];
   if (WRITES.includes(p) && origin && origin !== `http://localhost:${PORT}` && origin !== `http://127.0.0.1:${PORT}`) {
     return send(res, 403, JSON.stringify({ ok: false, error: "origin not allowed" }));
   }
@@ -413,6 +556,28 @@ const server = http.createServer(async (req, res) => {
       urls = urls.filter(Boolean);
       if (!urls.length) return send(res, 400, JSON.stringify({ ok: false, error: "no url" }));
 
+      // Only a bare playlist link fans out. A watch link that happens to carry
+      // &list= is still the one video he was looking at, which is how it has
+      // always behaved and must keep behaving.
+      let fromPlaylist = 0;
+      const expanded = [];
+      for (const u of urls) {
+        const full = /^https?:\/\//i.test(u) ? u : "https://" + u;
+        const list = !videoId(full) && playlistId(full);
+        if (!list) { expanded.push({ url: u }); continue; }
+        try {
+          const vids = await playlistVideos(list);
+          // Added last-first, so the playlist's own first video ends up on top.
+          for (const v of vids.reverse()) {
+            expanded.push({ url: `https://www.youtube.com/watch?v=${v.id}`, hint: v });
+          }
+          fromPlaylist += vids.length;
+        } catch (e) {
+          expanded.push({ url: u });
+        }
+      }
+      urls = expanded;
+
       const store = loadStore();
       purgeDeleted(store);
       const added = [];
@@ -420,12 +585,12 @@ const server = http.createServer(async (req, res) => {
       const failed = [];
       for (const u of urls) {
         try {
-          const r = await addOne(store, u);
-          if (!r.ok) failed.push(u);
+          const r = await addOne(store, u.url, u.hint);
+          if (!r.ok) failed.push(u.url);
           else if (r.duplicate) dupes.push(r.item.title);
           else added.push(r.item.title);
         } catch (e) {
-          failed.push(u);
+          failed.push(u.url);
         }
       }
       if (added.length) saveStore(store);
@@ -435,6 +600,7 @@ const server = http.createServer(async (req, res) => {
       if (url.searchParams.get("fmt") === "text") {
         let line;
         if (added.length === 1) line = "Added — " + added[0];
+        else if (added.length > 1 && fromPlaylist) line = `Added ${added.length} from a playlist`;
         else if (added.length > 1) line = `Added ${added.length} videos`;
         else if (dupes.length) line = "Already on your list";
         else line = "Could not read that link";
@@ -444,7 +610,7 @@ const server = http.createServer(async (req, res) => {
       return send(
         res,
         200,
-        JSON.stringify({ ok: true, added, dupes, failed, count: liveItems(store).length })
+        JSON.stringify({ ok: true, added, dupes, failed, fromPlaylist, count: liveItems(store).length })
       );
     }
 
@@ -488,6 +654,83 @@ const server = http.createServer(async (req, res) => {
       }
       if (marked || swept) saveStore(store);
       return send(res, 200, JSON.stringify({ ok: true, count: liveItems(store).length }));
+    }
+
+    if (p === "/api/backups") {
+      return send(res, 200, JSON.stringify({ ok: true, backups: listBackups() }));
+    }
+
+    if (p === "/api/backup" && req.method === "POST") {
+      const store = loadStore();
+      const made = manualBackup(store, "byhand");
+      return send(res, 200, JSON.stringify({ ok: true, ...made, backups: listBackups() }));
+    }
+
+    // A restore reads and checks the whole file BEFORE anything is written, and
+    // puts today's list safely aside first — so a restore is itself undoable and
+    // a bad file cannot leave him with nothing.
+    if (p === "/api/restore" && req.method === "POST") {
+      const j = JSON.parse(await readBody(req));
+      const file = String(j.file || "");
+      if (!BACKUP_NAME.test(file)) {
+        return send(res, 400, JSON.stringify({ ok: false, error: "not a backup file" }));
+      }
+      const full = path.join(BACKUPS, file);
+      if (!fs.existsSync(full)) {
+        return send(res, 404, JSON.stringify({ ok: false, error: "that copy is gone" }));
+      }
+
+      let restored;
+      try {
+        restored = JSON.parse(fs.readFileSync(full, "utf8"));
+        if (!restored || !Array.isArray(restored.items)) throw new Error("not a list");
+        for (const it of restored.items) {
+          if (!it || typeof it.id !== "string" || !it.id) throw new Error("a video has no id");
+        }
+      } catch (e) {
+        return send(
+          res,
+          400,
+          JSON.stringify({ ok: false, error: "that copy could not be read — nothing was changed" })
+        );
+      }
+
+      const current = loadStore();
+      const before = liveItems(current).length;
+      const safety = manualBackup(current, "beforerestore");
+      saveStore({ version: APP_VERSION, items: restored.items });
+
+      return send(
+        res,
+        200,
+        JSON.stringify({
+          ok: true,
+          count: restored.items.filter((it) => !it.deletedAt).length,
+          before,
+          safety: safety.file,
+          backups: listBackups(),
+        })
+      );
+    }
+
+    if (p === "/api/refresh" && req.method === "POST") {
+      const j = JSON.parse(await readBody(req));
+      const wanted = Array.isArray(j.ids) ? j.ids : [j.id];
+      const store = loadStore();
+      const out = { updated: [], gone: [], skipped: [] };
+      for (const item of store.items) {
+        if (!wanted.includes(item.id)) continue;
+        try {
+          const what = await refreshOne(item);
+          if (what === "updated") out.updated.push(item.title);
+          else if (what === "gone") out.gone.push(item.title);
+          else out.skipped.push(item.title);
+        } catch (e) {
+          out.skipped.push(item.title);
+        }
+      }
+      saveStore(store);
+      return send(res, 200, JSON.stringify({ ok: true, ...out }));
     }
 
     return send(res, 404, JSON.stringify({ ok: false, error: "not found" }));
