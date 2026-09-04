@@ -43,6 +43,7 @@
     }
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   html{background:var(--bg)}
   body{
     margin:0; background:var(--bg); color:var(--ink);
@@ -75,8 +76,11 @@
   button:disabled{opacity:.5; cursor:default}
   .hint{font-size:13px; color:var(--muted); margin:0 0 20px}
 
-  .filters{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:20px}
-  .filters .lab{font-size:14px; color:var(--muted); margin-right:2px}
+  .filters{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:9px}
+  .arrange{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:18px}
+  .filters .lab, .arrange .lab{font-size:14px; color:var(--muted); margin-right:2px}
+  .buckets, .sorts, .views{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .arrange .pill{font-size:13px; padding:5px 11px}
   .pill{
     font-size:14px; padding:7px 14px; border-radius:9px; cursor:pointer;
     background:var(--card); border:1px solid var(--line); color:var(--ink);
@@ -86,7 +90,52 @@
   .pill.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:500}
   .pill.on .n{color:var(--accent)}
 
+  .search{
+    display:flex; align-items:center; gap:7px; height:33px; padding:0 10px;
+    background:var(--card); border:1px solid var(--line); border-radius:9px;
+  }
+  .search:focus-within{border-color:var(--accent)}
+  .search > svg{color:var(--muted); flex:0 0 auto}
+  .search input{
+    width:140px; padding:0; border:0; outline:none; background:none; color:var(--ink);
+    font:14px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  .search .clr{
+    width:19px; height:19px; padding:0; border:0; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--shade); color:var(--muted); cursor:pointer;
+  }
+  .search .clr:hover{color:var(--ink); border:0}
+  .chip{
+    display:flex; align-items:center; gap:6px; font-size:13px; padding:5px 8px 5px 11px;
+    border-radius:9px; background:var(--accent-soft); color:var(--accent-ink);
+    border:1px solid var(--accent); cursor:pointer;
+  }
+  .chip:hover{opacity:.85; border:1px solid var(--accent)}
+
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:14px}
+
+  /* Compact — the picture becomes a strip down the side and the rows stack up,
+     so an evening's worth of choice fits on one screen. */
+  .grid.compact{grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:9px}
+  .grid.compact .card{flex-direction:row}
+  .grid.compact .thumb{width:112px; flex:0 0 112px; aspect-ratio:auto; align-self:stretch}
+  .grid.compact .thumb .play{display:none}
+  .grid.compact .thumb .dur{right:4px; bottom:4px; font-size:11px; padding:1px 5px}
+  .grid.compact .pin{right:auto; left:86px; top:4px; width:22px; height:22px}
+  .grid.compact .body{padding:7px 10px 8px; gap:2px}
+  .grid.compact .ttl{
+    font-size:13px; line-height:1.3;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .grid.compact .chan{font-size:12px}
+  .grid.compact .note{font-size:12px}
+  .grid.compact .note.blank{display:none}
+  .grid.compact .age{display:none}
+  .grid.compact .card.stale .age{display:flex; font-size:11px}
+  .grid.compact .row{padding-top:5px}
+  .grid.compact .ico{width:26px; height:26px}
+  .grid.compact .ico.wide{padding:0 9px; font-size:12px}
   .card{
     position:relative;
     background:var(--card); border:1px solid var(--line); border-radius:13px;
@@ -131,7 +180,8 @@
   .body{padding:9px 11px 10px; display:flex; flex-direction:column; flex:1; gap:4px}
   .ttl{font-size:14px; font-weight:500; line-height:1.34; margin:0; cursor:pointer}
   .ttl:hover{color:var(--accent)}
-  .chan{font-size:13px; color:var(--muted); margin:0}
+  .chan{font-size:13px; color:var(--muted); margin:0; cursor:pointer; align-self:flex-start}
+  .chan:hover{color:var(--accent); text-decoration:underline; text-underline-offset:2px}
   .note{
     font-size:12.5px; line-height:1.4; color:var(--muted); margin:0; cursor:text;
     display:flex; gap:5px; align-items:flex-start;
@@ -202,7 +252,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.4</span>
+    <span class="ver" id="ver">v1.5</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -213,7 +263,26 @@
   </div>
   <p class="hint">Or, with a video open in Safari, run <b>Add to WatchLater</b> from Raycast or Alfred — it saves the video without leaving the page. Links can also be dropped straight onto this window.</p>
 
-  <div class="filters" id="filters"></div>
+  <div class="filters">
+    <span class="lab">I have</span>
+    <span class="buckets" id="buckets"></span>
+    <span class="total" id="total"></span>
+    <span class="spacer"></span>
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="10.8" r="5.6" stroke="currentColor" stroke-width="1.7"/><path d="M15.3 15.2c1.4 1.5 2.6 2.7 3.6 3.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <input id="q" type="text" placeholder="Search" autocomplete="off" spellcheck="false">
+      <button class="clr" id="qclr" title="Clear" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.4 7.2c3.2 3.1 6.3 6.1 9.4 9M16.7 7.2c-3.2 3.1-6.3 6.1-9.4 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+    </div>
+    <button class="pill" id="watchedbtn"></button>
+  </div>
+
+  <div class="arrange">
+    <span class="lab">Sort</span>
+    <span class="sorts" id="sorts"></span>
+    <button class="chip" id="chanchip" hidden></button>
+    <span class="spacer"></span>
+    <span class="views" id="views"></span>
+  </div>
 
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden></div>
@@ -236,6 +305,14 @@
         <b>A line about why you saved it.</b> Under the title of every card there is room for one line in your own words — <i>for the trip</i>, <i>the bit about sleep</i>, <i>watch with Lisa</i>. Click it and type; Return saves, Escape forgets it. Three weeks later the title alone rarely tells you what you were after, and that is exactly when a video gets skipped over instead of watched. It is one line on the card on purpose — nothing here deserves a screen of its own.
         <br><br>
         <b>Pinning.</b> The pin in the corner of a picture holds that video at the top of the list, above everything else, until you press it again. For the one or two you have actually decided to watch next, rather than the pile you might.
+        <br><br>
+        <b>Finding one particular video.</b> Type into the <b>Search</b> box, top right. It looks at titles and channel names as you type, and it ignores accents — <i>hjarnans</i> finds <i>hjärnans</i>, <i>kaffet</i> finds <i>En AI till Kaffet</i>. Because you are now looking for one thing rather than asking what fits in twenty minutes, the row opens up to <b>Everything</b> on its own, so the video cannot be hiding behind a slot that is too short. Escape, or the little cross, clears it.
+        <br><br>
+        <b>Only this channel.</b> Click the channel name under any title — <i>Raycast</i>, <i>Big Think</i> — and the list narrows to that channel alone, with its name shown as a green tag under <b>Sort</b>. Click the tag to go back to everything. It is the quickest way to line up three videos from the same person and take them in one sitting.
+        <br><br>
+        <b>Sort.</b> <b>Newest</b> is the normal order, with anything the three-month nudge has flagged floated to the top. <b>Shortest</b> and <b>Longest</b> reorder by length — and <b>Longest</b> with a time slot picked is the useful one: it shows what fills the twenty minutes best, rather than the four-minute clip you would have got through anyway. Pinned videos stay on top whichever you choose.
+        <br><br>
+        <b>Cards or Compact.</b> <b>Cards</b> is the picture-first layout. <b>Compact</b> shrinks each picture to a strip down the side and stacks the rows up, so roughly three times as many fit on the screen — the one to use when the list has grown and you are scanning rather than browsing. This Mac remembers which you chose, along with the sort. Compact leaves out the empty <i>why did you save this</i> prompt to save a line; notes you have already written still show, and you can add one in Cards.
         <br><br>
         <b>Lengths arrive on their own.</b> When a link comes in, the length is read straight off the YouTube page, here on this Mac. There is no account, no key and nothing to set up. If a video has been made private or taken down the length cannot be read, and rather than saving a blank card the app tells you it could not read the link. For anything that is not YouTube, the card asks you to tap a rough length so it still lands in the right time bucket.
         <br><br>
@@ -263,7 +340,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.4</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.5</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Search</b> — titles and channels, as you type, accents ignored.</li>
+            <li><b>Click a channel name</b> to see only that channel.</li>
+            <li><b>Sort</b> by newest, shortest or longest.</li>
+            <li><b>Compact view</b> — pictures become a strip and about three times as many videos fit on screen. Remembered on this Mac.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> up to now there was exactly one way through the list — the time you had — and that works beautifully at twenty videos and starts to fail at sixty. These four are all the same idea from different sides: stop scrolling to find things. Search is for when you know what you want, the channel tag is for when you want more of the same, sort is for when you want the best use of the evening, and Compact is for when you just want to see the whole pile at once instead of a screenful at a time.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.4</span><span class="reldate">4 September 2026</span></div>
           <ul>
             <li><b>How much is in front of you</b> — the button row now says <b>9 videos · 2 h 40 min</b> for whatever is showing.</li>
             <li><b>A note on each card</b> — one line, in your words, on why you saved it. Click under the title and type.</li>
@@ -331,15 +419,47 @@ const BUCKETS = [
 ];
 const STALE_DAYS = 90;
 
+const SORTS = [
+  { key:"new",   label:"Newest" },
+  { key:"short", label:"Shortest" },
+  { key:"long",  label:"Longest" },
+];
+const VIEWS = [
+  { key:"cards",   label:"Cards",   icon:"cards" },
+  { key:"compact", label:"Compact", icon:"rows"  },
+];
+
 let items = [];
 let filter = "all";
 let showWatched = false;
+let query = "";
+let channel = null;
+let sortBy = "new";
+let view = "cards";
 // A note being typed must never be swept away by a background reload — the
 // window regaining focus reloads the list, and that would wipe the box
 // mid-sentence.
 let editing = 0;
 
 const $ = (id) => document.getElementById(id);
+
+// How the list is arranged is a per-device habit, not data — this Mac keeps it,
+// nothing is written into the list itself.
+function loadPrefs(){
+  try{
+    const p = JSON.parse(localStorage.getItem("wl-prefs") || "{}");
+    if (SORTS.some((x) => x.key === p.sortBy)) sortBy = p.sortBy;
+    if (VIEWS.some((x) => x.key === p.view)) view = p.view;
+  } catch(e){ /* a browser with storage switched off is not a problem */ }
+}
+function savePrefs(){
+  try{ localStorage.setItem("wl-prefs", JSON.stringify({ sortBy, view })); } catch(e){}
+}
+
+// Searching has to ignore accents, or "hjarnans" would never find "hjärnans".
+function fold(s){
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
 function fmtDur(s){
   if (s == null) return null;
@@ -394,6 +514,9 @@ function icon(name, size = 17){
     keep:  '<path d="M12 4.7c-1.4 3.6-3 5.4-6.4 6.1 3.1 2.6 4.8 5.3 5.4 8.5.8-3.4 2.7-6.1 6-8.5-3.3-.7-4.9-2.5-5-6.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
     film:  '<rect x="3.6" y="6.2" width="16.8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 6.4v11.6M15.6 6.4v11.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
     pin:   '<path d="M9 4.1c2-.5 4-.5 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.3 4.5c.3 2.6-.5 4.7-2.4 6.3 2.8.7 5.5.7 8.2 0-1.9-1.6-2.7-3.7-2.4-6.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.9 11.4c0 3.2-.2 5.9-.5 8.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    cards: '<rect x="4.1" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.1" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    cross: '<path d="M7.4 7.2c3.2 3.1 6.3 6.1 9.4 9M16.7 7.2c-3.2 3.1-6.3 6.1-9.4 9" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>',
+    rows:  '<rect x="3.9" y="5.3" width="16.2" height="4.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3.9" y="14.3" width="16.2" height="4.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/>',
     pencil:'<path d="M4.7 19.3c.3-1.7.7-3 1.2-3.9L15.6 5.4c.6-.6 1.5-.6 2.1 0l.9.9c.6.6.6 1.5 0 2.1L8.6 18.1c-.9.5-2.2.9-3.9 1.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   }[name];
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
@@ -401,36 +524,44 @@ function icon(name, size = 17){
 
 function visible(){
   let list = items.filter((it) => (showWatched ? !!it.watchedAt : !it.watchedAt));
+
+  const q = fold(query.trim());
+  if (q) list = list.filter((it) => fold(it.title).includes(q) || fold(it.channel).includes(q));
+  if (channel) list = list.filter((it) => it.channel === channel);
+
+  // A time slot answers "what can I watch now". Searching or picking a channel
+  // asks "where is that one video", so those switch the row to Everything
+  // rather than quietly hiding the answer behind a slot that is too short.
   if (!showWatched && filter !== "all"){
     const max = BUCKETS.find((b) => b.key === filter).max;
     list = list.filter((it) => it.seconds != null && it.seconds <= max);
   }
-  if (showWatched){
-    list.sort((a,b) => (b.watchedAt||"").localeCompare(a.watchedAt||""));
-  } else {
-    // Pinned videos sit above everything, newest pin at the very top; the
-    // three-month nudge still floats the rest of the old ones up.
-    list.sort((a,b) => {
-      const pa = a.pinnedAt ? 1 : 0, pb = b.pinnedAt ? 1 : 0;
-      if (pa !== pb) return pb - pa;
-      if (pa) return (b.pinnedAt||"").localeCompare(a.pinnedAt||"");
-      return (isStale(b)?1:0)-(isStale(a)?1:0) || (b.savedAt||"").localeCompare(a.savedAt||"");
-    });
-  }
+
+  const order = (a,b) => {
+    if (sortBy === "short") return (a.seconds ?? 1e9) - (b.seconds ?? 1e9);
+    if (sortBy === "long")  return (b.seconds ?? -1) - (a.seconds ?? -1);
+    if (showWatched) return (b.watchedAt||"").localeCompare(a.watchedAt||"");
+    // Newest, with the three-month nudge floating the old ones up.
+    return (isStale(b)?1:0)-(isStale(a)?1:0) || (b.savedAt||"").localeCompare(a.savedAt||"");
+  };
+
+  // Pinned videos sit above everything whatever the sort, newest pin at the top.
+  list.sort((a,b) => {
+    const pa = a.pinnedAt ? 1 : 0, pb = b.pinnedAt ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    if (pa) return (b.pinnedAt||"").localeCompare(a.pinnedAt||"");
+    return order(a,b);
+  });
   return list;
 }
 
-function renderFilters(list){
+
+function renderControls(list){
   const open = items.filter((it) => !it.watchedAt);
   const done = items.length - open.length;
-  const f = $("filters");
-  f.textContent = "";
 
-  const lab = document.createElement("span");
-  lab.className = "lab";
-  lab.textContent = "I have";
-  f.append(lab);
-
+  const b0 = $("buckets");
+  b0.textContent = "";
   for (const b of BUCKETS){
     const n = b.max === Infinity
       ? open.length
@@ -439,26 +570,53 @@ function renderFilters(list){
     el.className = "pill" + (!showWatched && filter === b.key ? " on" : "");
     el.innerHTML = `${b.label} <span class="n">· ${n}</span>`;
     el.onclick = () => { showWatched = false; filter = b.key; render(); };
-    f.append(el);
+    b0.append(el);
   }
 
-  const tot = document.createElement("span");
-  tot.className = "total";
-  tot.textContent = list.length ? "· " + fmtTotal(list) : "";
-  f.append(tot);
+  $("total").textContent = list.length ? "· " + fmtTotal(list) : "";
+  $("qclr").hidden = !query;
 
-  const sp = document.createElement("span");
-  sp.className = "spacer";
-  f.append(sp);
-
-  const w = document.createElement("button");
+  const w = $("watchedbtn");
   w.className = "pill" + (showWatched ? " on" : "");
   w.innerHTML = `${icon("tick")}<span class="n"> Watched · ${done}</span>`;
   w.style.display = "flex";
   w.style.alignItems = "center";
   w.style.gap = "5px";
   w.onclick = () => { showWatched = !showWatched; render(); };
-  f.append(w);
+
+  const so = $("sorts");
+  so.textContent = "";
+  for (const o of SORTS){
+    const el = document.createElement("button");
+    el.className = "pill" + (sortBy === o.key ? " on" : "");
+    el.textContent = o.label;
+    el.onclick = () => { sortBy = o.key; savePrefs(); render(); };
+    so.append(el);
+  }
+
+  const chip = $("chanchip");
+  chip.hidden = !channel;
+  if (channel){
+    chip.textContent = channel;
+    const x = document.createElement("span");
+    x.innerHTML = icon("cross", 12);
+    chip.append(x);
+    chip.title = "Show every channel again";
+    chip.onclick = () => { channel = null; render(); };
+  }
+
+  const v = $("views");
+  v.textContent = "";
+  for (const o of VIEWS){
+    const el = document.createElement("button");
+    el.className = "pill" + (view === o.key ? " on" : "");
+    el.innerHTML = `${icon(o.icon, 14)}<span>${o.label}</span>`;
+    el.style.display = "flex";
+    el.style.alignItems = "center";
+    el.style.gap = "6px";
+    el.onclick = () => { view = o.key; savePrefs(); render(); };
+    v.append(el);
+  }
 }
 
 // Titles and channel names come from YouTube, so they are placed with
@@ -522,6 +680,13 @@ function card(it){
     const c = document.createElement("p");
     c.className = "chan";
     c.textContent = it.channel;
+    c.title = "Only show " + it.channel;
+    c.onclick = () => {
+      channel = it.channel;
+      filter = "all";
+      showWatched = false;
+      render();
+    };
     body.append(c);
   }
 
@@ -658,8 +823,9 @@ function editNote(node, it){
 
 function render(){
   const list = visible();
-  renderFilters(list);
+  renderControls(list);
   const g = $("grid");
+  g.className = "grid" + (view === "compact" ? " compact" : "");
   g.textContent = "";
   for (const it of list) g.append(card(it));
 
@@ -671,11 +837,11 @@ function render(){
     e.hidden = true;
   } else {
     e.hidden = false;
-    e.textContent = showWatched
-      ? "Nothing ticked off yet."
-      : items.length
-        ? "Nothing that short on the list. Try a longer slot."
-        : "Paste a YouTube link above to start.";
+    if (query.trim()) e.textContent = `Nothing matches “${query.trim()}”.`;
+    else if (channel) e.textContent = `Nothing from ${channel} left to watch.`;
+    else if (showWatched) e.textContent = "Nothing ticked off yet.";
+    else if (items.length) e.textContent = "Nothing that short on the list. Try a longer slot.";
+    else e.textContent = "Paste a YouTube link above to start.";
   }
 }
 
@@ -782,11 +948,29 @@ document.addEventListener("drop", (e) => {
   if (text) add(text);
 });
 
+$("q").addEventListener("input", (e) => {
+  query = e.target.value;
+  // Looking for one video is not the same question as "what fits in 20 minutes",
+  // so the row opens up rather than hiding the thing being looked for.
+  if (query.trim()) filter = "all";
+  render();
+});
+$("q").addEventListener("keydown", (e) => {
+  if (e.key === "Escape"){ e.preventDefault(); query = ""; e.target.value = ""; render(); }
+});
+$("qclr").onclick = () => {
+  query = "";
+  $("q").value = "";
+  $("q").focus();
+  render();
+};
+
 // Coming back to the window after adding from the Dock should show it.
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !editing) load();
 });
 
+loadPrefs();
 load();
 </script>
 </body>
