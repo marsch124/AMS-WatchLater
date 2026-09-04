@@ -16,7 +16,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.7";
+const APP_VERSION = "1.8";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -495,7 +495,8 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   const origin = req.headers.origin || "";
 
-  if (HUB_ORIGINS.includes(origin) && (p === "/health" || p === "/version.json")) {
+  const HUB_READS = ["/health", "/version.json", "/api/stats"];
+  if (HUB_ORIGINS.includes(origin) && HUB_READS.includes(p)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
@@ -654,6 +655,28 @@ const server = http.createServer(async (req, res) => {
       }
       if (marked || swept) saveStore(store);
       return send(res, 200, JSON.stringify({ ok: true, count: liveItems(store).length }));
+    }
+
+    // For the Main Hub's tile. Numbers only — no titles, no links, nothing that
+    // says WHAT he is watching, since this is the one answer another page on
+    // another port is allowed to read.
+    if (p === "/api/stats") {
+      const live = liveItems(loadStore());
+      const open = live.filter((it) => !it.watchedAt);
+      const fits = (max) => open.filter((it) => it.seconds != null && it.seconds <= max).length;
+      const secs = open.reduce((n, it) => n + (it.seconds || 0), 0);
+      return send(
+        res,
+        200,
+        JSON.stringify({
+          ok: true,
+          version: APP_VERSION,
+          toWatch: open.length,
+          watched: live.length - open.length,
+          minutes: Math.round(secs / 60),
+          fits: { 5: fits(5 * 60), 20: fits(20 * 60), 60: fits(60 * 60) },
+        })
+      );
     }
 
     if (p === "/api/backups") {
