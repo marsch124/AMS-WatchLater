@@ -131,6 +131,8 @@
   .grid.compact .chan{font-size:12px}
   .grid.compact .note{font-size:12px}
   .grid.compact .note.blank{display:none}
+  .grid.compact .tags{display:none}
+  .grid.compact .pick{width:20px; height:20px; left:4px; top:4px; border-radius:6px}
   .grid.compact .age{display:none}
   .grid.compact .card.stale .age{display:flex; font-size:11px}
   .grid.compact .row{padding-top:5px}
@@ -190,13 +192,43 @@
   .note svg{flex:0 0 auto; margin-top:2px; opacity:.75}
   .note.blank{opacity:0; transition:opacity .12s}
   .card:hover .note.blank{opacity:.75}
-  .noteedit{
+  .editbox{display:flex; flex-direction:column; gap:5px}
+  .editbox input, .editbox textarea{
     width:100%; margin:0; padding:5px 7px; resize:none;
     font:12.5px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
     color:var(--ink); background:var(--bg);
-    border:1px solid var(--accent); border-radius:7px;
+    border:1px solid var(--accent); border-radius:7px; outline:none;
   }
-  .noteedit:focus{outline:none}
+  .editbox .sug{display:flex; flex-wrap:wrap; gap:4px}
+  .editbox .sug .tag{background:none; border:1px dashed var(--line)}
+
+  .tags{display:flex; flex-wrap:wrap; gap:5px; margin:1px 0 0}
+  .tag{
+    font-size:11.5px; line-height:1; padding:4px 8px; border-radius:20px; cursor:pointer;
+    background:var(--shade); border:1px solid transparent; color:var(--muted);
+  }
+  .tag:hover{border-color:var(--muted); color:var(--ink)}
+  .tag.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink)}
+
+  .pick{
+    position:absolute; left:7px; top:7px; width:24px; height:24px; padding:0;
+    border:0; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,18,15,.68); color:#fff; cursor:pointer;
+    opacity:0; transition:opacity .12s;
+  }
+  .card:hover .pick, body.picking .pick{opacity:1}
+  .pick:hover{background:rgba(20,18,15,.92); border:0}
+  .pick.on{opacity:1; background:var(--accent)}
+  .pick.on:hover{background:var(--accent); opacity:.85}
+  .card.picked{border-color:var(--accent)}
+
+  .bulk{
+    display:flex; align-items:center; gap:9px; flex-wrap:wrap; font-size:14px;
+    background:var(--accent-soft); border:1px solid var(--accent); color:var(--accent-ink);
+    border-radius:11px; padding:9px 11px; margin-bottom:14px;
+  }
+  .bulk b{font-weight:500}
+  .bulk button{font-size:13px; padding:6px 11px; border-radius:8px; display:flex; align-items:center; gap:5px}
   .age{font-size:12px; color:var(--muted); margin:0; display:flex; align-items:center; gap:5px}
   .card.stale .age{color:var(--amber)}
   .row{display:flex; gap:6px; align-items:center; margin-top:auto; padding-top:7px}
@@ -252,7 +284,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.5</span>
+    <span class="ver" id="ver">v1.6</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -280,9 +312,13 @@
     <span class="lab">Sort</span>
     <span class="sorts" id="sorts"></span>
     <button class="chip" id="chanchip" hidden></button>
+    <span class="lab" id="taglab" hidden>Tags</span>
+    <span class="sorts" id="tagpills"></span>
     <span class="spacer"></span>
     <span class="views" id="views"></span>
   </div>
+
+  <div class="bulk" id="bulk" hidden></div>
 
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden></div>
@@ -305,6 +341,12 @@
         <b>A line about why you saved it.</b> Under the title of every card there is room for one line in your own words — <i>for the trip</i>, <i>the bit about sleep</i>, <i>watch with Lisa</i>. Click it and type; Return saves, Escape forgets it. Three weeks later the title alone rarely tells you what you were after, and that is exactly when a video gets skipped over instead of watched. It is one line on the card on purpose — nothing here deserves a screen of its own.
         <br><br>
         <b>Pinning.</b> The pin in the corner of a picture holds that video at the top of the list, above everything else, until you press it again. For the one or two you have actually decided to watch next, rather than the pile you might.
+        <br><br>
+        <b>Tags — your own words.</b> Click the note line under a title and you get two boxes: the line about why you saved it, and under it <b>tags</b>, separated by commas — <i>AI</i>, <i>Woodworking</i>, <i>Sport</i>. Tags you have already used appear as dashed suggestions; clicking one adds it, which keeps the same idea from ending up spelled three ways. Every tag you use turns up as a filter under <b>Sort</b>, with a count, and the tags on a card can be clicked too. Channels tell you who made a video; tags tell you what it is <i>for</i>, and only you know that.
+        <br><br>
+        <b>Doing several at once.</b> Hover a card and a tick box appears in the top-left corner of its picture. Pick a few and a green bar appears above the list: <b>tick them all off</b>, or <b>remove them all</b>. Both can be undone for five seconds, same as one at a time. This is for the evening you look at the list and realise nine of them are never going to be watched — one pass, done, instead of nine little decisions.
+        <br><br>
+        <b>“Did you finish it?”</b> When you open a video from here, the app remembers you started it. Next time you look at the list that card asks, once, whether you finished it. <b>Yes</b> ticks it off; <b>Not yet</b> leaves it alone and stops asking until you open it again — and the card then says <i>Started three days ago</i> rather than <i>Saved last month</i>, so a video you are halfway through never looks the same as one you have not touched. That gap is where half-watched things used to disappear.
         <br><br>
         <b>Finding one particular video.</b> Type into the <b>Search</b> box, top right. It looks at titles and channel names as you type, and it ignores accents — <i>hjarnans</i> finds <i>hjärnans</i>, <i>kaffet</i> finds <i>En AI till Kaffet</i>. Because you are now looking for one thing rather than asking what fits in twenty minutes, the row opens up to <b>Everything</b> on its own, so the video cannot be hiding behind a slot that is too short. Escape, or the little cross, clears it.
         <br><br>
@@ -340,7 +382,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.5</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.6</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Tags</b> — your own words on a video, in the same box as the note. Every tag becomes a filter under Sort.</li>
+            <li><b>Pick several</b> with the tick box on a picture, then tick off or remove the lot in one go — undoable.</li>
+            <li><b>“Did you finish it?”</b> — a video you opened is asked about once, so half-watched ones stop vanishing.</li>
+            <li>Cards now say <b>Started three days ago</b> instead of <b>Saved last month</b> once you have opened them.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the list can now be cut three ways that have nothing to do with time — what a video is for, who made it, and whether you have already begun it. Tags are the one only you can supply, and they are the difference between a heap and a shelf. Picking several matters because clearing out is the job you keep not doing: nine separate decisions never happen, one pass does. And the finished question closes the oldest hole in the thing — you would watch twenty minutes of something, close the tab, and it would sit there for a month looking exactly like a video you had never opened.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.5</span><span class="reldate">4 September 2026</span></div>
           <ul>
             <li><b>Search</b> — titles and channels, as you type, accents ignored.</li>
             <li><b>Click a channel name</b> to see only that channel.</li>
@@ -434,6 +487,8 @@ let filter = "all";
 let showWatched = false;
 let query = "";
 let channel = null;
+let tag = null;
+const picked = new Set();
 let sortBy = "new";
 let view = "cards";
 // A note being typed must never be swept away by a background reload — the
@@ -515,11 +570,38 @@ function icon(name, size = 17){
     film:  '<rect x="3.6" y="6.2" width="16.8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 6.4v11.6M15.6 6.4v11.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
     pin:   '<path d="M9 4.1c2-.5 4-.5 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.3 4.5c.3 2.6-.5 4.7-2.4 6.3 2.8.7 5.5.7 8.2 0-1.9-1.6-2.7-3.7-2.4-6.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.9 11.4c0 3.2-.2 5.9-.5 8.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
     cards: '<rect x="4.1" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.1" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    label: '<path d="M5 10.4c.1-2 .3-3.8.6-5.4 1.7-.3 3.5-.5 5.4-.6l7.7 7.7c.6.6.6 1.6 0 2.2l-3.8 3.8c-.6.6-1.6.6-2.2 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8.5" cy="8.3" r="1.25" fill="currentColor"/>',
     cross: '<path d="M7.4 7.2c3.2 3.1 6.3 6.1 9.4 9M16.7 7.2c-3.2 3.1-6.3 6.1-9.4 9" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>',
     rows:  '<rect x="3.9" y="5.3" width="16.2" height="4.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3.9" y="14.3" width="16.2" height="4.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/>',
     pencil:'<path d="M4.7 19.3c.3-1.7.7-3 1.2-3.9L15.6 5.4c.6-.6 1.5-.6 2.1 0l.9.9c.6.6.6 1.5 0 2.1L8.6 18.1c-.9.5-2.2.9-3.9 1.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   }[name];
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
+}
+
+// Every tag he has used anywhere, most-used first — for the row of filters and
+// for the suggestions in the editor, so the same word does not get typed two
+// slightly different ways.
+function allTags(){
+  const seen = new Map();
+  for (const it of items){
+    for (const t of it.tags || []){
+      const key = t.toLowerCase();
+      const e = seen.get(key) || { tag: t, n: 0 };
+      e.n++;
+      seen.set(key, e);
+    }
+  }
+  return [...seen.values()].sort((a,b) => b.n - a.n || a.tag.localeCompare(b.tag));
+}
+
+function hasTag(it, t){
+  return (it.tags || []).some((x) => x.toLowerCase() === String(t).toLowerCase());
+}
+
+// A video he opened but has not ticked off gets asked about once, the next time
+// he looks at the list — so half-watched things do not quietly disappear.
+function needsAnswer(it){
+  return !it.watchedAt && !!it.startedAt && (!it.answeredAt || it.answeredAt < it.startedAt);
 }
 
 function visible(){
@@ -528,6 +610,7 @@ function visible(){
   const q = fold(query.trim());
   if (q) list = list.filter((it) => fold(it.title).includes(q) || fold(it.channel).includes(q));
   if (channel) list = list.filter((it) => it.channel === channel);
+  if (tag) list = list.filter((it) => hasTag(it, tag));
 
   // A time slot answers "what can I watch now". Searching or picking a channel
   // asks "where is that one video", so those switch the row to Everything
@@ -605,6 +688,23 @@ function renderControls(list){
     chip.onclick = () => { channel = null; render(); };
   }
 
+  const tags = allTags();
+  $("taglab").hidden = !tags.length;
+  const tp = $("tagpills");
+  tp.textContent = "";
+  for (const t of tags.slice(0, 8)){
+    const el = document.createElement("button");
+    const on = tag && tag.toLowerCase() === t.tag.toLowerCase();
+    el.className = "pill" + (on ? " on" : "");
+    el.innerHTML = `${t.tag} <span class="n">· ${t.n}</span>`;
+    el.onclick = () => {
+      tag = on ? null : t.tag;
+      if (tag){ filter = "all"; showWatched = false; }
+      render();
+    };
+    tp.append(el);
+  }
+
   const v = $("views");
   v.textContent = "";
   for (const o of VIEWS){
@@ -667,6 +767,18 @@ function card(it){
   };
   el.append(pin);
 
+  const pick = document.createElement("button");
+  pick.className = "pick" + (picked.has(it.id) ? " on" : "");
+  pick.title = picked.has(it.id) ? "Take out of the selection" : "Pick this one";
+  pick.innerHTML = icon("tick", 15);
+  pick.onclick = (e) => {
+    e.stopPropagation();
+    if (picked.has(it.id)) picked.delete(it.id); else picked.add(it.id);
+    render();
+  };
+  el.append(pick);
+  if (picked.has(it.id)) el.classList.add("picked");
+
   const body = document.createElement("div");
   body.className = "body";
 
@@ -695,16 +807,62 @@ function card(it){
   paintNote(note, it);
   body.append(note);
 
+  if ((it.tags || []).length){
+    const tg = document.createElement("div");
+    tg.className = "tags";
+    for (const t of it.tags){
+      const el2 = document.createElement("button");
+      el2.className = "tag" + (tag && tag.toLowerCase() === t.toLowerCase() ? " on" : "");
+      el2.textContent = t;
+      el2.title = "Only show " + t;
+      el2.onclick = (e) => {
+        e.stopPropagation();
+        tag = (tag && tag.toLowerCase() === t.toLowerCase()) ? null : t;
+        filter = "all";
+        showWatched = false;
+        render();
+      };
+      tg.append(el2);
+    }
+    body.append(tg);
+  }
+
   const a = document.createElement("p");
   a.className = "age";
   if (isStale(it)){
     a.innerHTML = icon("glass");
     a.append(` Sat here ${Math.floor(staleClock(it)/30)} months — still want it?`);
   } else {
+    let when = it.savedAt, word = "Saved";
+    if (it.watchedAt){ when = it.watchedAt; word = "Watched"; }
+    else if (it.startedAt){ when = it.startedAt; word = "Started"; }
     a.innerHTML = icon("clock");
-    a.append(" " + fmtAge(it.watchedAt ? it.watchedAt : it.savedAt).replace("Saved", it.watchedAt ? "Watched" : "Saved"));
+    a.append(" " + fmtAge(when).replace("Saved", word));
   }
   body.append(a);
+
+  // Opening a video is not the same as finishing it. Rather than let a
+  // half-watched one drift back into the pile, the card asks once.
+  if (needsAnswer(it)){
+    const ask = document.createElement("div");
+    ask.className = "askdur";
+    const b = document.createElement("b");
+    b.textContent = "Did you finish it?";
+    ask.append(b);
+    const yes = document.createElement("button");
+    yes.textContent = "Yes";
+    yes.onclick = (e) => {
+      e.stopPropagation();
+      patch(it.id, { watched: true });
+      toast("Ticked off — " + short(it.title), () => patch(it.id, { watched: false }));
+    };
+    ask.append(yes);
+    const not = document.createElement("button");
+    not.textContent = "Not yet";
+    not.onclick = (e) => { e.stopPropagation(); patch(it.id, { answered: true }); };
+    ask.append(not);
+    body.append(ask);
+  }
 
   // A video whose length could not be read would never match a time bucket,
   // so the card asks for a rough one rather than hiding from every filter.
@@ -775,7 +933,7 @@ function card(it){
 
 function paintNote(node, it){
   node.className = "note" + (it.note ? "" : " blank");
-  node.title = it.note ? "Change this note" : "Add a note";
+  node.title = it.note ? "Change this note or its tags" : "Add a note or tags";
   node.textContent = "";
   const ic = document.createElement("span");
   ic.innerHTML = icon("pencil", 12);
@@ -783,19 +941,52 @@ function paintNote(node, it){
   const tx = document.createElement("span");
   tx.textContent = it.note || "Why did you save this?";
   node.append(tx);
-  node.onclick = () => editNote(node, it);
+  node.onclick = () => editWords(node, it);
 }
 
-// Return saves, Escape throws the change away, clicking elsewhere saves —
-// which is what everything else on the Mac does.
-function editNote(node, it){
+// One inline editor for both of the things that are HIS words about a video:
+// the line on why he saved it, and its tags. Return saves, Escape throws the
+// change away, clicking elsewhere saves — what the Mac does everywhere else.
+function editWords(node, it){
+  const box = document.createElement("div");
+  box.className = "editbox";
+
   const ta = document.createElement("textarea");
-  ta.className = "noteedit";
   ta.rows = 2;
   ta.maxLength = 500;
   ta.placeholder = "Why did you save this?";
   ta.value = it.note || "";
-  node.replaceWith(ta);
+  box.append(ta);
+
+  const tg = document.createElement("input");
+  tg.type = "text";
+  tg.placeholder = "Tags, separated by commas";
+  tg.value = (it.tags || []).join(", ");
+  box.append(tg);
+
+  const known = allTags().filter((t) => !hasTag(it, t.tag)).slice(0, 8);
+  if (known.length){
+    const sug = document.createElement("div");
+    sug.className = "sug";
+    for (const t of known){
+      const b = document.createElement("button");
+      b.className = "tag";
+      b.textContent = t.tag;
+      // mousedown rather than click: a click would take the focus out of the
+      // field first, which would close and save the editor before it lands.
+      b.onmousedown = (e) => {
+        e.preventDefault();
+        const cur = tg.value.split(",").map((x) => x.trim()).filter(Boolean);
+        if (!cur.some((x) => x.toLowerCase() === t.tag.toLowerCase())) cur.push(t.tag);
+        tg.value = cur.join(", ");
+        tg.focus();
+      };
+      sug.append(b);
+    }
+    box.append(sug);
+  }
+
+  node.replaceWith(box);
   editing++;
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -805,25 +996,86 @@ function editNote(node, it){
     if (closed) return;
     closed = true;
     editing--;
-    const val = ta.value.trim();
-    if (save && val !== (it.note || "")){
-      it.note = val;
-      patch(it.id, { note: val });
+    const note = ta.value.trim();
+    const tags = tg.value
+      .split(",")
+      .map((x) => x.trim().replace(/\s+/g, " ").slice(0, 24))
+      .filter(Boolean)
+      .slice(0, 6);
+    const changed = note !== (it.note || "") || tags.join("|") !== (it.tags || []).join("|");
+    if (save && changed){
+      it.note = note;
+      it.tags = tags;
+      patch(it.id, { note, tags });
     } else {
       paintNote(node, it);
-      ta.replaceWith(node);
+      box.replaceWith(node);
     }
   };
-  ta.onblur = () => finish(true);
-  ta.onkeydown = (e) => {
-    if (e.key === "Escape"){ e.preventDefault(); finish(false); }
-    if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); ta.blur(); }
+
+  // Moving from the note to the tags is not leaving the editor.
+  box.addEventListener("focusout", (e) => {
+    if (!box.contains(e.relatedTarget)) finish(true);
+  });
+  for (const f of [ta, tg]){
+    f.onkeydown = (e) => {
+      if (e.key === "Escape"){ e.preventDefault(); finish(false); }
+      if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); finish(true); }
+    };
+  }
+}
+
+// Everything the bar can do is undoable, so there is no question to answer here
+// either — see the note on the bin.
+function renderBulk(){
+  const bar = $("bulk");
+  for (const id of [...picked]) if (!items.some((it) => it.id === id)) picked.delete(id);
+  document.body.classList.toggle("picking", picked.size > 0);
+  bar.hidden = picked.size === 0;
+  if (bar.hidden) return;
+
+  const ids = [...picked];
+  const chosen = items.filter((it) => picked.has(it.id));
+  const anyOpen = chosen.some((it) => !it.watchedAt);
+  bar.textContent = "";
+
+  const n = document.createElement("b");
+  n.textContent = `${ids.length} picked`;
+  bar.append(n);
+
+  const t = document.createElement("button");
+  t.innerHTML = icon("tick", 15) + `<span>${anyOpen ? "Tick off" : "Put back"}</span>`;
+  t.onclick = async () => {
+    picked.clear();
+    await patchMany(ids, { watched: anyOpen });
+    toast(`${ids.length} ${anyOpen ? "ticked off" : "back on the list"}`,
+          () => patchMany(ids, { watched: !anyOpen }));
   };
+  bar.append(t);
+
+  const d = document.createElement("button");
+  d.innerHTML = icon("bin", 15) + "<span>Remove</span>";
+  d.onclick = async () => {
+    picked.clear();
+    await removeMany(ids);
+    toast(`${ids.length} removed`, () => patchMany(ids, { restore: true }));
+  };
+  bar.append(d);
+
+  const sp = document.createElement("span");
+  sp.style.flex = "1";
+  bar.append(sp);
+
+  const c = document.createElement("button");
+  c.textContent = "Clear";
+  c.onclick = () => { picked.clear(); render(); };
+  bar.append(c);
 }
 
 function render(){
   const list = visible();
   renderControls(list);
+  renderBulk();
   const g = $("grid");
   g.className = "grid" + (view === "compact" ? " compact" : "");
   g.textContent = "";
@@ -839,6 +1091,7 @@ function render(){
     e.hidden = false;
     if (query.trim()) e.textContent = `Nothing matches “${query.trim()}”.`;
     else if (channel) e.textContent = `Nothing from ${channel} left to watch.`;
+    else if (tag) e.textContent = `Nothing tagged ${tag} left to watch.`;
     else if (showWatched) e.textContent = "Nothing ticked off yet.";
     else if (items.length) e.textContent = "Nothing that short on the list. Try a longer slot.";
     else e.textContent = "Paste a YouTube link above to start.";
@@ -868,6 +1121,9 @@ function toast(msg, action){
 
 function open_(it){
   window.open(it.url, "_blank");
+  // Recorded after the window is opened, so the click stays a direct one and
+  // Safari does not treat it as a pop-up.
+  if (!it.watchedAt) patch(it.id, { started: true });
 }
 
 async function load(){
@@ -890,6 +1146,24 @@ async function patch(id, change){
 // No "are you sure". A question you answer every time stops being read; five
 // seconds of Undo costs nothing and actually catches the mistake. The engine
 // only marks the video, so nothing is really gone while the offer stands.
+async function patchMany(ids, change){
+  await fetch("/api/update", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(Object.assign({ ids }, change)),
+  });
+  await load();
+}
+
+async function removeMany(ids){
+  await fetch("/api/delete", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  await load();
+}
+
 async function remove(it){
   await fetch("/api/delete", {
     method:"POST",

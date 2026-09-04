@@ -16,7 +16,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.5";
+const APP_VERSION = "1.6";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -291,10 +291,30 @@ async function addOne(store, rawUrl) {
     keptAt: null,
     pinnedAt: null,
     deletedAt: null,
+    startedAt: null,
+    answeredAt: null,
+    tags: [],
     note: "",
   };
   store.items.unshift(item);
   return { ok: true, item };
+}
+
+// His words, not a taxonomy — but two spellings of the same word would split a
+// filter in half, so they are trimmed, de-duplicated case-blind and capped.
+function cleanTags(raw) {
+  const list = Array.isArray(raw) ? raw : String(raw || "").split(",");
+  const seen = new Set();
+  const out = [];
+  for (const t of list) {
+    const tag = String(t).trim().replace(/\s+/g, " ").slice(0, 24);
+    const key = tag.toLowerCase();
+    if (!tag || seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length === 6) break;
+  }
+  return out;
 }
 
 /* ---------- http ---------- */
@@ -428,28 +448,45 @@ const server = http.createServer(async (req, res) => {
       );
     }
 
+    // Takes `id` for one video or `ids` for several — ticking off six at once
+    // is then a single write of the file rather than six.
     if (p === "/api/update" && req.method === "POST") {
       const j = JSON.parse(await readBody(req));
       const store = loadStore();
-      const item = store.items.find((it) => it.id === j.id);
-      if (!item) return send(res, 404, JSON.stringify({ ok: false }));
-      if ("watched" in j) item.watchedAt = j.watched ? new Date().toISOString() : null;
-      if ("keep" in j) item.keptAt = j.keep ? new Date().toISOString() : null;
-      if ("seconds" in j) item.seconds = j.seconds == null ? null : +j.seconds;
-      if ("note" in j) item.note = String(j.note || "").slice(0, 500);
-      if ("pin" in j) item.pinnedAt = j.pin ? new Date().toISOString() : null;
-      if (j.restore) item.deletedAt = null;
+      const wanted = Array.isArray(j.ids) ? j.ids : [j.id];
+      const touched = store.items.filter((it) => wanted.includes(it.id));
+      if (!touched.length) return send(res, 404, JSON.stringify({ ok: false }));
+
+      const now = new Date().toISOString();
+      for (const item of touched) {
+        if ("watched" in j) item.watchedAt = j.watched ? now : null;
+        if ("keep" in j) item.keptAt = j.keep ? now : null;
+        if ("seconds" in j) item.seconds = j.seconds == null ? null : +j.seconds;
+        if ("note" in j) item.note = String(j.note || "").slice(0, 500);
+        if ("pin" in j) item.pinnedAt = j.pin ? now : null;
+        if ("started" in j) item.startedAt = j.started ? now : null;
+        if ("answered" in j) item.answeredAt = j.answered ? now : null;
+        if ("tags" in j) item.tags = cleanTags(j.tags);
+        if (j.restore) item.deletedAt = null;
+      }
       saveStore(store);
-      return send(res, 200, JSON.stringify({ ok: true, item }));
+      return send(res, 200, JSON.stringify({ ok: true, item: touched[0], items: touched }));
     }
 
     if (p === "/api/delete" && req.method === "POST") {
       const j = JSON.parse(await readBody(req));
       const store = loadStore();
       const swept = purgeDeleted(store);
-      const item = store.items.find((it) => it.id === j.id);
-      if (item && !item.deletedAt) item.deletedAt = new Date().toISOString();
-      if (item || swept) saveStore(store);
+      const wanted = Array.isArray(j.ids) ? j.ids : [j.id];
+      const now = new Date().toISOString();
+      let marked = 0;
+      for (const item of store.items) {
+        if (wanted.includes(item.id) && !item.deletedAt) {
+          item.deletedAt = now;
+          marked++;
+        }
+      }
+      if (marked || swept) saveStore(store);
       return send(res, 200, JSON.stringify({ ok: true, count: liveItems(store).length }));
     }
 
