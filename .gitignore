@@ -11,3 +11,7 @@ thumbs/
 
 # macOS clutter
 .DS_Store
+
+# The drop folder is a personal path and this repository is PUBLIC.
+# config.example.json shows the shape.
+config.json

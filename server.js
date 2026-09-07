@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.10";
+const APP_VERSION = "1.11";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -28,10 +28,34 @@ const APP_VERSION = "1.10";
 // itself or into its own Shortcuts folder, depending on where the destination
 // is picked, and being wrong about that would look exactly like it not working.
 const ICLOUD = path.join(os.homedir(), "Library/Mobile Documents");
+
+// Where the folder lives is a personal thing and this repository is public, so
+// the real path sits in config.json, which git never sees. Without one the
+// app falls back to the top of iCloud Drive, which works for anybody.
+function readConfig() {
+  try {
+    const c = JSON.parse(fs.readFileSync(path.join(APP_DIR, "config.json"), "utf8"));
+    if (c && typeof c.dropFolder === "string" && c.dropFolder.trim()) {
+      const d = c.dropFolder.trim();
+      return path.isAbsolute(d) ? d : path.join(os.homedir(), d);
+    }
+  } catch (e) {
+    /* no config, or an unreadable one — the default below is fine */
+  }
+  return path.join(ICLOUD, "com~apple~CloudDocs/AMS WatchLater");
+}
+
+// The folder he actually uses, plus two that are watched but never created:
+// the old default, and the folder Shortcuts saves into when the destination is
+// picked there instead. Catching a link in the wrong place costs nothing;
+// losing one because it went somewhere unwatched costs his trust in the whole
+// thing.
+const DROP_MAIN = readConfig();
 const DROPS = [
+  DROP_MAIN,
   path.join(ICLOUD, "com~apple~CloudDocs/AMS WatchLater"),
   path.join(ICLOUD, "iCloud~is~workflow~my~workflows/Documents/AMS WatchLater"),
-];
+].filter((d, i, all) => all.indexOf(d) === i);
 const DROP_EVERY = 30000;
 const DROP_MAX_BYTES = 65536;
 
@@ -518,7 +542,7 @@ async function addMany(store, rawUrls) {
 /* ---------- the drop folder ---------- */
 
 function dropReady() {
-  return fs.existsSync(ICLOUD);
+  return fs.existsSync(DROP_MAIN);
 }
 
 const DROP_NOTE = `AMS WatchLater — the drop folder
@@ -540,7 +564,8 @@ Setting that shortcut up, once:
      else.
   4. Add Action -> search for "Save File" -> choose it.
   5. On Save File, open its settings and turn "Ask Where To Save" OFF.
-  6. Tap the destination and pick iCloud Drive -> AMS WatchLater.
+  6. Tap the destination and pick the folder this note is sitting in:
+     iCloud Drive -> Documents -> 03 Home -> 02 IT -> 01 SW -> AMS WatchLater
   7. Tap the name at the top -> Details -> turn on "Show in Share Sheet".
   8. Name it "Add to WatchLater" and tap Done.
 
@@ -560,17 +585,14 @@ This file is rewritten by the app, so there is no point editing it.
 `;
 
 function ensureDrops() {
-  if (!dropReady()) return;
-  for (const dir of DROPS) {
-    try {
-      if (!fs.existsSync(path.dirname(dir))) continue;
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const note = path.join(dir, "Read me.txt");
-      const already = fs.existsSync(note) ? fs.readFileSync(note, "utf8") : "";
-      if (already !== DROP_NOTE) fs.writeFileSync(note, DROP_NOTE);
-    } catch (e) {
-      /* iCloud not signed in, or the folder cannot be made — nothing to do */
-    }
+  try {
+    if (!fs.existsSync(path.dirname(DROP_MAIN))) return;
+    if (!fs.existsSync(DROP_MAIN)) fs.mkdirSync(DROP_MAIN, { recursive: true });
+    const note = path.join(DROP_MAIN, "Read me.txt");
+    const already = fs.existsSync(note) ? fs.readFileSync(note, "utf8") : "";
+    if (already !== DROP_NOTE) fs.writeFileSync(note, DROP_NOTE);
+  } catch (e) {
+    /* the folder cannot be made — nothing sensible to do about it here */
   }
 }
 
@@ -753,9 +775,9 @@ const server = http.createServer(async (req, res) => {
           version: APP_VERSION,
           items: liveItems(store),
           drop: {
-            ready: dropReady() && DROPS.some(fs.existsSync),
+            ready: dropReady(),
             waiting: dropWaiting(),
-            folders: DROPS.map((d) => ({ path: d.replace(os.homedir(), "~"), exists: fs.existsSync(d) })),
+            folder: DROP_MAIN.replace(os.homedir(), "~"),
           },
         })
       );

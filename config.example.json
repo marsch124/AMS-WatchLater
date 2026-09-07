@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy this to config.json and set the folder your phone drops links into. A relative path is taken from your home folder. It must be somewhere iCloud Drive syncs, or the phone cannot reach it. Leave config.json out and the app uses iCloud Drive/AMS WatchLater.",
+  "dropFolder": "Documents/My Folders/AMS WatchLater"
+}

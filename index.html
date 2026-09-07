@@ -302,7 +302,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.10</span>
+    <span class="ver" id="ver">v1.11</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -356,7 +356,7 @@
         <br><br>
         <b>Saving from the iPhone or the iPad.</b> Your list lives on this Mac and nothing on the internet can reach it — which is the point, but it does mean the phone cannot simply send it a video. So it does not try to. The phone drops a small file into <b>iCloud Drive</b>, and this Mac picks it up whenever it is next awake. That is deliberate: anything that talks to the Mac directly fails silently the moment the lid is shut, whereas a file just waits.
         <br><br>
-        The folder is <b>iCloud Drive → AMS WatchLater</b>. <b>You do not have to make it</b> — this Mac creates it, and it appears in <b>Files</b> on the phone and the iPad by itself. It has a <b>Read me</b> in it with the setup below, partly so the folder explains itself when you find it on the phone, and partly because a completely empty folder is the one thing iCloud may not bother showing you. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
+        The folder sits with your other AMS folders, at <b>01 SW → AMS WatchLater</b>. On the phone that is <b>Files → iCloud Drive → Documents → 03 Home → 02 IT → 01 SW → AMS WatchLater</b>. <b>You do not have to make it</b> — this Mac creates it, and it has a <b>Read me</b> in it carrying the setup below, partly so the folder explains itself when you find it on the phone, and partly because a completely empty folder is the one thing iCloud may not bother showing you. Which folder it is lives in a small <b>config.json</b> beside the app, so moving it later is one line and nothing personal sits in the public code. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
         <br><br>
         <b>Setting up the phone, once.</b> This takes about two minutes and you only do it on one device — Shortcuts carries it over to the other by itself.
         <br>1 — Open <b>Shortcuts</b> and tap <b>+</b> to start a new one.
@@ -364,7 +364,7 @@
         <br>3 — Tap inside the text box, then tap <b>Shortcut Input</b> in the row of suggestions above the keyboard. The box should now contain that one blue variable and nothing else.
         <br>4 — Tap <b>Add Action</b> again, search for <b>Save File</b>, and choose it.
         <br>5 — On the Save File action, tap the little arrow to open its settings and turn <b>Ask Where To Save</b> <b>off</b>.
-        <br>6 — Tap the destination it then shows and pick <b>iCloud Drive → AMS WatchLater</b>.
+        <br>6 — Tap the destination it then shows and pick <b>iCloud Drive → Documents → 03 Home → 02 IT → 01 SW → AMS WatchLater</b>.
         <br>7 — Tap the shortcut's name at the top, then <b>Details</b>, and turn on <b>Show in Share Sheet</b>. Leave the accepted types as they are.
         <br>8 — Name it <b>Add to WatchLater</b> and tap <b>Done</b>.
         <br><br>
@@ -372,7 +372,7 @@
         <br><br>
         <b>When they turn up.</b> This Mac looks in the folder every thirty seconds while the engine is running, so a video saved on the phone is usually on the list within a minute of the Mac being awake. If the Mac was asleep or shut, everything you saved lands the next time it wakes. <b>Your data</b> below shows whether the folder is ready and how many files are waiting, and has a <b>Look in the phone folder now</b> button if you would rather not wait.
         <br><br>
-        <b>If something does not arrive.</b> Almost always the Mac was asleep — wake it, open this app, and it will be there. If a file is sitting in the folder with <b>.no-links</b> on the end, there was no link in it: open it on the phone and check what the share sheet actually put in. And if you saved from Shortcuts into its own folder rather than the one above, that is covered too — this Mac watches <b>iCloud Drive → Shortcuts → AMS WatchLater</b> as well.
+        <b>If something does not arrive.</b> Almost always the Mac was asleep — wake it, open this app, and it will be there. If a file is sitting in the folder with <b>.no-links</b> on the end, there was no link in it: open it on the phone and check what the share sheet actually put in. And if the link ended up somewhere else, that is probably covered anyway: as well as your folder, this Mac quietly watches the old <b>iCloud Drive → AMS WatchLater</b> and <b>iCloud Drive → Shortcuts → AMS WatchLater</b>, without creating either. Catching a link in the wrong place costs nothing; losing one would cost you your trust in the whole thing.
         <br><br>
         <b>One direction only.</b> This sends videos to the Mac; it does not put the list on your phone. Watching, ticking off and everything else still happens here.
         <br><br>
@@ -439,7 +439,17 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.10</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.11</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li>The drop folder moved to where your other AMS folders live — <b>01 SW → AMS WatchLater</b>.</li>
+            <li>Which folder it is now lives in a small <b>config.json</b> beside the app, so it can be moved again in one line.</li>
+            <li>The two old places are still watched quietly, so nothing sent to them would be lost.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> a folder dumped at the top of iCloud Drive by a program is exactly the kind of thing that makes a filing system stop being yours — and one you did not choose is one you will not look after. It now sits where you would have put it. Keeping the path in config.json rather than in the code matters for a second reason: this app's code is public, and your folder names are not.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.10</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li>The drop folder now contains a <b>Read me</b> with the phone setup in it, so it explains itself when you find it in Files.</li>
             <li>That also makes sure the folder is never empty — an empty folder is the one case iCloud may not show on the phone at all.</li>
