@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.15";
+const APP_VERSION = "1.16";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -247,6 +247,10 @@ function videoId(url) {
     if (m) return m[1];
   }
   return null;
+}
+
+function isShortUrl(url) {
+  return /\/shorts\/[A-Za-z0-9_-]{11}/.test(String(url || ""));
 }
 
 function get(url, redirects = 0) {
@@ -515,6 +519,7 @@ async function addOne(store, rawUrl, hint) {
     savedAt: new Date().toISOString(),
     watchedAt: null,
     keptAt: null,
+    isShort: isShortUrl(url),
     pinnedAt: null,
     togetherAt: null,
     deletedAt: null,

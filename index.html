@@ -212,6 +212,10 @@
   .body{padding:9px 11px 10px; display:flex; flex-direction:column; flex:1; gap:4px}
   .ttl{font-size:14px; font-weight:500; line-height:1.34; margin:0; cursor:pointer}
   .ttl:hover{color:var(--accent)}
+  .shortmark{
+    font-size:10px; font-weight:600; letter-spacing:.6px; padding:2px 6px; border-radius:5px;
+    background:var(--shade); color:var(--muted); margin-right:6px; vertical-align:2px;
+  }
   .chan{font-size:13px; color:var(--muted); margin:0; cursor:pointer; align-self:flex-start}
   .chan:hover{color:var(--accent); text-decoration:underline; text-underline-offset:2px}
   .note{
@@ -332,7 +336,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.15</span>
+    <span class="ver" id="ver">v1.16</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -428,6 +432,8 @@
         <br><br>
         <b>Checking a card is still true.</b> Titles get rewritten, videos get made private, thumbnails get swapped. Pick one or several with the tick box and press <b>Check</b> in the green bar: the app asks YouTube again and brings the title, channel, length and picture up to date. Anything that has been taken down is marked <b>Not on YouTube any more</b> in amber rather than deleted — throwing it away is your decision, not the app's.
         <br><br>
+        <b>Shorts are kept apart.</b> A Short is not a short video — you flick through them, you do not sit down to one. So they are <b>left out of the time slots</b>: when you have five minutes, that button offers you a real four-minute video rather than a pile of ten-second clips. They still count under <b>Everything</b>, they carry a small <b>SHORT</b> mark on the card, and they get their own <b>Shorts</b> button which only appears once you have some. An evening leaves them out too — unless you are looking at Shorts when you ask for one, in which case that is plainly what you meant.
+        <br><br>
         <b>Plan an evening.</b> The button row answers "what fits in twenty minutes". <b>Plan an evening</b>, on the right of the Sort row, answers a different question: <i>I have forty-five minutes — make something of it.</i> Pick a length and it works out a <b>combination</b> that fills it, rather than showing you everything short enough, and puts exactly those on screen, shortest first.
         <br><br>
         <b>Try another</b> gives you a different evening of the same length — there is usually more than one way to fill it, and it deliberately avoids handing you back the one you just saw. Where two are equally good it leans towards clearing out something pinned or something the three-month nudge has flagged. <b>A link that plays it</b> turns the evening into one YouTube link, so it can run on the television without you touching anything again.
@@ -487,7 +493,17 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.15</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.16</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Shorts have their own button</b>, which appears only once you have some.</li>
+            <li>They are kept out of the <b>5 min</b>, <b>20 min</b> and <b>An hour</b> slots, and out of a planned evening — but still counted under Everything.</li>
+            <li>A small <b>SHORT</b> mark on the card, so one is never mistaken for a four-minute video.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the time buttons are the one thing this app is really for, and they only work if what they offer is worth sitting down to. One eleven-second clip in the five-minute slot is harmless; twenty of them would quietly ruin the feature, because the answer to "I have five minutes" would stop being a video and start being a scroll. Keeping them apart costs nothing — they are one button away when that <i>is</i> what you want.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.15</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li><b>Plan an evening</b> — say how long you have and it builds a combination that fills it, instead of a list of everything that fits.</li>
             <li><b>Try another</b> for a different evening of the same length; ties go to something pinned or something going stale.</li>
@@ -664,8 +680,14 @@ const BUCKETS = [
   { key:"20",  label:"20 min",    max:20*60 },
   { key:"60",  label:"An hour",   max:60*60 },
   { key:"all", label:"Everything",max:Infinity },
+  { key:"shorts", label:"Shorts", shorts:true },
 ];
 const STALE_DAYS = 90;
+// A Short is a different thing from a short video: you flick through them, you
+// do not sit down to one. Anything saved from a /shorts/ link counts, and so
+// does anything under a minute — which catches the ones saved before the app
+// started writing that down.
+const SHORT_MAX = 60;
 
 const SORTS = [
   { key:"new",   label:"Newest" },
@@ -849,6 +871,10 @@ function short(t, n = 40){
   return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
 }
 
+function isShortVid(it){
+  return it.isShort === true || (it.seconds != null && it.seconds <= SHORT_MAX);
+}
+
 function staleClock(it){
   return daysSince(it.keptAt || it.savedAt);
 }
@@ -922,9 +948,14 @@ function visible(){
   // A time slot answers "what can I watch now". Searching or picking a channel
   // asks "where is that one video", so those switch the row to Everything
   // rather than quietly hiding the answer behind a slot that is too short.
-  if (!showWatched && filter !== "all"){
+  if (!showWatched && filter === "shorts"){
+    list = list.filter(isShortVid);
+  } else if (!showWatched && filter !== "all"){
+    // The time slots are for things you sit down to, so Shorts stay out of them
+    // — otherwise a pile of ten-second clips crowds out the four-minute video
+    // you actually had five minutes for. They are still under Everything.
     const max = BUCKETS.find((b) => b.key === filter).max;
-    list = list.filter((it) => it.seconds != null && it.seconds <= max);
+    list = list.filter((it) => !isShortVid(it) && it.seconds != null && it.seconds <= max);
   }
 
   const order = (a,b) => {
@@ -953,9 +984,12 @@ function renderControls(list){
   const b0 = $("buckets");
   b0.textContent = "";
   for (const b of BUCKETS){
-    const n = b.max === Infinity
-      ? open.length
-      : open.filter((it) => it.seconds != null && it.seconds <= b.max).length;
+    const n = b.shorts
+      ? open.filter(isShortVid).length
+      : b.max === Infinity
+        ? open.length
+        : open.filter((it) => !isShortVid(it) && it.seconds != null && it.seconds <= b.max).length;
+    if (b.shorts && !n && filter !== "shorts") continue;   // no Shorts, no pill
     const el = document.createElement("button");
     el.className = "pill" + (!showWatched && filter === b.key ? " on" : "");
     el.innerHTML = `${b.label} <span class="n">· ${n}</span>`;
@@ -1108,7 +1142,17 @@ function card(it){
   t.onclick = () => open_(it);
   body.append(t);
 
-  if (it.channel){
+  if (isShortVid(it)){
+    const m = document.createElement("p");
+    m.className = "chan";
+    m.style.cursor = "default";
+    const chip = document.createElement("span");
+    chip.className = "shortmark";
+    chip.textContent = "SHORT";
+    m.append(chip);
+    if (it.channel) m.append(it.channel);
+    body.append(m);
+  } else if (it.channel){
     const c = document.createElement("p");
     c.className = "chan";
     c.textContent = it.channel;
@@ -1116,6 +1160,7 @@ function card(it){
     c.onclick = () => {
       channel = it.channel;
       filter = "all";
+      plan = null;
       showWatched = false;
       render();
     };
@@ -1448,18 +1493,21 @@ function renderBulk(){
 // The pool is whatever is on screen, so a Together mark, a tag or a channel all
 // narrow the evening for free — "an evening for the two of us" needs no switch
 // of its own.
-function planPool(){
+function planPool(includeShorts){
   const was = plan;
   plan = null;
   const pool = visible();
   plan = was;
-  return pool;
+  // An evening made of forty ten-second clips is not an evening.
+  return includeShorts ? pool : pool.filter((it) => !isShortVid(it));
 }
 
 function setPlan(minutes, avoidKey){
-  filter = "all";           // the budget IS the time limit; a slot as well would only confuse
+  // If he is looking at Shorts, an evening of Shorts is what he means.
+  const onShorts = filter === "shorts";
+  if (!onShorts) filter = "all";   // the budget IS the time limit; a slot too would only confuse
   showWatched = false;
-  const made = makePlan(planPool(), minutes, avoidKey);
+  const made = makePlan(planPool(onShorts), minutes, avoidKey);
   plan = made
     ? { minutes, ids: made.chosen.map((it) => it.id), key: made.key, used: made.used }
     : { minutes, ids: [], key: "", used: 0 };
@@ -1625,6 +1673,7 @@ function render(){
     else if (tag) e.textContent = `Nothing tagged ${tag} left to watch.`;
     else if (together) e.textContent = "Nothing marked to watch together yet.";
     else if (plan) e.textContent = "Nothing on the list fits an evening that long.";
+    else if (filter === "shorts") e.textContent = "No Shorts on the list.";
     else if (showWatched) e.textContent = "Nothing ticked off yet.";
     else if (items.length) e.textContent = "Nothing that short on the list. Try a longer slot.";
     else e.textContent = "Paste a YouTube link above to start.";
