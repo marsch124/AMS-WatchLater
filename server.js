@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.14";
+const APP_VERSION = "1.15";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers

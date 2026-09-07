@@ -200,6 +200,9 @@
   .grid.compact .pair{width:22px; height:22px; left:4px; bottom:4px}
 
   .bulk.pairbar{background:var(--pair-soft); border-color:var(--pair-line); color:var(--pair)}
+  .bulk.planbar{background:var(--amber-soft); border-color:var(--amber-line); color:var(--amber)}
+  .planbar .pill{font-size:13px; padding:5px 11px; background:var(--card); border-color:var(--amber-line); color:var(--amber)}
+  .planbar .pill.on{background:var(--amber); border-color:var(--amber); color:var(--bg); font-weight:500}
   .pairout{
     width:100%; margin:4px 0 0; padding:9px 11px; resize:vertical; min-height:64px;
     font:13px/1.5 ui-monospace,Menlo,monospace; color:var(--ink); background:var(--card);
@@ -329,7 +332,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.14</span>
+    <span class="ver" id="ver">v1.15</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -361,9 +364,11 @@
     <span class="lab" id="taglab" hidden>Tags</span>
     <span class="sorts" id="tagpills"></span>
     <span class="spacer"></span>
+    <button class="pill" id="planbtn"></button>
     <span class="views" id="views"></span>
   </div>
 
+  <div class="bulk planbar" id="planbar" hidden></div>
   <div class="bulk pairbar" id="pairbar" hidden></div>
   <div class="bulk" id="bulk" hidden></div>
 
@@ -423,6 +428,12 @@
         <br><br>
         <b>Checking a card is still true.</b> Titles get rewritten, videos get made private, thumbnails get swapped. Pick one or several with the tick box and press <b>Check</b> in the green bar: the app asks YouTube again and brings the title, channel, length and picture up to date. Anything that has been taken down is marked <b>Not on YouTube any more</b> in amber rather than deleted — throwing it away is your decision, not the app's.
         <br><br>
+        <b>Plan an evening.</b> The button row answers "what fits in twenty minutes". <b>Plan an evening</b>, on the right of the Sort row, answers a different question: <i>I have forty-five minutes — make something of it.</i> Pick a length and it works out a <b>combination</b> that fills it, rather than showing you everything short enough, and puts exactly those on screen, shortest first.
+        <br><br>
+        <b>Try another</b> gives you a different evening of the same length — there is usually more than one way to fill it, and it deliberately avoids handing you back the one you just saw. Where two are equally good it leans towards clearing out something pinned or something the three-month nudge has flagged. <b>A link that plays it</b> turns the evening into one YouTube link, so it can run on the television without you touching anything again.
+        <br><br>
+        Whatever is already narrowing the list narrows the evening too. Press <b>Together</b> first and you get an evening for the two of you; tap a channel or a tag first and you get an evening of those. There is no extra switch for it — it just uses whatever is on screen.
+        <br><br>
         <b>Watching something together.</b> The two little figures in the bottom-left corner of a picture mark a video as one to watch <b>with someone else</b>. Mark a few and a <b>Together</b> button appears at the top; press it and the list narrows to those, with a purple bar above it.
         <br><br>
         That bar does the useful part. <b>Copy a link that plays them</b> gives you a <b>single YouTube link</b> that plays every marked video, one after another — send it to her phone, open it on the iPad, put it on the television. <b>Copy a message to send</b> gives you the same thing written out to paste into Messages or WhatsApp: the titles numbered with their lengths, so she can pick one, and the link underneath in case she would rather just press play. Neither button sends anything anywhere — it goes on your clipboard and you decide where it goes.
@@ -476,7 +487,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.14</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.15</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Plan an evening</b> — say how long you have and it builds a combination that fills it, instead of a list of everything that fits.</li>
+            <li><b>Try another</b> for a different evening of the same length; ties go to something pinned or something going stale.</li>
+            <li>It uses whatever is already narrowing the list, so <b>Together</b> first gives you an evening for two.</li>
+            <li>The evening turns into one link that plays it, like everything else you can pick here.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the time buttons answer "what could I watch", and after a while that is not the hard part any more — with ten videos on the list, four of them fit in twenty minutes and you still have to choose. This answers "what shall I watch", which is the question you actually have at nine in the evening. Filling forty-five minutes with a twenty, a fifteen and two short ones is arithmetic you should not be doing yourself, and it is the difference between opening the list and closing it again, and opening the list and watching something.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.14</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li><b>Together</b> — mark a video as one to watch with someone else, with the two figures on its picture, and a Together button to see just those.</li>
             <li><b>One link that plays them all.</b> Any set — the Together ones, or anything you tick — becomes a single YouTube link that plays them in order on any screen.</li>
@@ -662,6 +684,8 @@ let query = "";
 let channel = null;
 let tag = null;
 let together = false;
+let plan = null;                       // { minutes, ids, key }
+const PLAN_BUDGETS = [30, 45, 60, 90, 120];
 const picked = new Set();
 let sortBy = "new";
 let view = "cards";
@@ -726,6 +750,54 @@ function fmtTotal(list){
 // it, so any handful of these can become ONE link that plays them in order on
 // her phone, the iPad or the television. That is what makes this useful rather
 // than just a list of titles.
+// "What fits in twenty minutes" is a filter. "I have forty-five minutes" is a
+// different question: it wants a COMBINATION that fills the evening, not a list
+// of everything short enough. This is the small knapsack that answers it —
+// exact, because with a handful of videos and a budget in minutes it costs
+// nothing to be exact.
+function fillBudget(list, budget){
+  const best = new Array(budget + 1).fill(null);
+  best[0] = [];
+  for (const it of list){
+    const m = Math.max(1, Math.round(it.seconds / 60));
+    if (m > budget) continue;
+    for (let t = budget; t >= m; t--){
+      if (best[t - m] && !best[t]) best[t] = best[t - m].concat([it]);
+    }
+  }
+  for (let t = budget; t >= 0; t--) if (best[t]) return best[t];
+  return [];
+}
+
+// Shuffling before each run changes which of the equally good answers is found
+// first, which is what makes "Try another" give something genuinely different
+// rather than the same evening with the titles in a new order.
+function makePlan(pool, minutes, avoidKey){
+  const cands = pool.filter((it) => it.seconds != null && it.seconds > 0 && !it.watchedAt);
+  let best = null;
+  for (let attempt = 0; attempt < 14; attempt++){
+    const order = cands.slice().sort(() => Math.random() - 0.5);
+    const chosen = fillBudget(order, minutes);
+    if (!chosen.length) continue;
+    const key = chosen.map((it) => it.id).sort().join(",");
+    if (avoidKey && key === avoidKey && attempt < 13) continue;
+    const used = chosen.reduce((n, it) => n + Math.max(1, Math.round(it.seconds / 60)), 0);
+    // A dead heat goes to the evening that clears out something pinned or old.
+    const score = used + chosen.filter((it) => it.pinnedAt || isStale(it)).length * 0.4;
+    if (!best || score > best.score) best = { chosen, key, used, score };
+  }
+  return best;
+}
+
+function planItems(){
+  if (!plan) return [];
+  const byId = new Map(items.map((it) => [it.id, it]));
+  return plan.ids
+    .map((id) => byId.get(id))
+    .filter((it) => it && !it.watchedAt)
+    .sort((a, b) => (a.seconds || 0) - (b.seconds || 0));
+}
+
 function playlistLink(list){
   const ids = list.filter((it) => it.videoId).map((it) => it.videoId).slice(0, 50);
   return ids.length ? "https://www.youtube.com/watch_videos?video_ids=" + ids.join(",") : null;
@@ -835,6 +907,10 @@ function needsAnswer(it){
 }
 
 function visible(){
+  // An evening is a decision already made — show exactly it, shortest first, so
+  // the long one is the one that gets dropped if the evening runs out.
+  if (plan && !showWatched) return planItems();
+
   let list = items.filter((it) => (showWatched ? !!it.watchedAt : !it.watchedAt));
 
   const q = fold(query.trim());
@@ -883,7 +959,7 @@ function renderControls(list){
     const el = document.createElement("button");
     el.className = "pill" + (!showWatched && filter === b.key ? " on" : "");
     el.innerHTML = `${b.label} <span class="n">· ${n}</span>`;
-    el.onclick = () => { showWatched = false; filter = b.key; render(); };
+    el.onclick = () => { plan = null; showWatched = false; filter = b.key; render(); };
     b0.append(el);
   }
 
@@ -896,7 +972,7 @@ function renderControls(list){
   w.style.display = "flex";
   w.style.alignItems = "center";
   w.style.gap = "5px";
-  w.onclick = () => { showWatched = !showWatched; render(); };
+  w.onclick = () => { plan = null; showWatched = !showWatched; render(); };
 
   const so = $("sorts");
   so.textContent = "";
@@ -1369,6 +1445,84 @@ function renderBulk(){
   bar.append(c);
 }
 
+// The pool is whatever is on screen, so a Together mark, a tag or a channel all
+// narrow the evening for free — "an evening for the two of us" needs no switch
+// of its own.
+function planPool(){
+  const was = plan;
+  plan = null;
+  const pool = visible();
+  plan = was;
+  return pool;
+}
+
+function setPlan(minutes, avoidKey){
+  filter = "all";           // the budget IS the time limit; a slot as well would only confuse
+  showWatched = false;
+  const made = makePlan(planPool(), minutes, avoidKey);
+  plan = made
+    ? { minutes, ids: made.chosen.map((it) => it.id), key: made.key, used: made.used }
+    : { minutes, ids: [], key: "", used: 0 };
+  render();
+}
+
+function renderPlan(){
+  const btn = $("planbtn");
+  btn.className = "pill" + (plan ? " on" : "");
+  btn.textContent = plan ? "Planning" : "Plan an evening";
+  btn.onclick = () => { if (plan) { plan = null; render(); } else setPlan(45); };
+
+  const bar = $("planbar");
+  bar.hidden = !plan;
+  if (bar.hidden) return;
+  bar.textContent = "";
+
+  const lab = document.createElement("b");
+  lab.textContent = "An evening of";
+  bar.append(lab);
+
+  for (const m of PLAN_BUDGETS){
+    const el = document.createElement("button");
+    el.className = "pill" + (plan.minutes === m ? " on" : "");
+    el.textContent = m < 60 ? `${m} min` : (m % 60 ? `${Math.floor(m / 60)}\u00bd h` : `${m / 60} h`);
+    el.onclick = () => setPlan(m);
+    bar.append(el);
+  }
+
+  const list = planItems();
+  const say = document.createElement("span");
+  say.style.fontSize = "13px";
+  say.textContent = list.length
+    ? "\u00b7 " + fmtTotal(list)
+    : "\u00b7 nothing on the list fits that";
+  bar.append(say);
+
+  const sp = document.createElement("span");
+  sp.style.flex = "1";
+  bar.append(sp);
+
+  if (list.length){
+    const again = document.createElement("button");
+    again.innerHTML = icon("redo", 15) + "<span>Try another</span>";
+    again.onclick = () => setPlan(plan.minutes, plan.key);
+    bar.append(again);
+
+    const link = document.createElement("button");
+    link.innerHTML = icon("link", 15) + "<span>A link that plays it</span>";
+    link.onclick = async () => {
+      const url = playlistLink(list);
+      if (!url){ toast("None of those are YouTube videos."); return; }
+      toast((await copyText(url)) ? "Copied — it plays the evening in order." : "Could not reach the clipboard.");
+    };
+    bar.append(link);
+  }
+
+  const off = document.createElement("button");
+  off.textContent = "Show everything";
+  off.onclick = () => { plan = null; render(); };
+  bar.append(off);
+}
+
 function renderPair(){
   const marked = items.filter((it) => it.togetherAt && !it.watchedAt);
   const btn = $("pairbtn");
@@ -1450,6 +1604,7 @@ function renderPair(){
 function render(){
   const list = visible();
   renderControls(list);
+  renderPlan();
   renderPair();
   renderBulk();
   const g = $("grid");
@@ -1469,6 +1624,7 @@ function render(){
     else if (channel) e.textContent = `Nothing from ${channel} left to watch.`;
     else if (tag) e.textContent = `Nothing tagged ${tag} left to watch.`;
     else if (together) e.textContent = "Nothing marked to watch together yet.";
+    else if (plan) e.textContent = "Nothing on the list fits an evening that long.";
     else if (showWatched) e.textContent = "Nothing ticked off yet.";
     else if (items.length) e.textContent = "Nothing that short on the list. Try a longer slot.";
     else e.textContent = "Paste a YouTube link above to start.";
@@ -1775,7 +1931,7 @@ $("q").addEventListener("input", (e) => {
   query = e.target.value;
   // Looking for one video is not the same question as "what fits in 20 minutes",
   // so the row opens up rather than hiding the thing being looked for.
-  if (query.trim()) filter = "all";
+  if (query.trim()){ filter = "all"; plan = null; }
   render();
 });
 $("q").addEventListener("keydown", (e) => {
