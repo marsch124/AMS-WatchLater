@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.9";
+const APP_VERSION = "1.10";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -521,13 +521,53 @@ function dropReady() {
   return fs.existsSync(ICLOUD);
 }
 
+const DROP_NOTE = `AMS WatchLater — the drop folder
+==================================
+
+Anything you put in here that contains a YouTube link is added to your
+WatchLater list on the Mac, and the file is then removed. You do not need to
+tidy up after it.
+
+You should not have to put anything here by hand. On the iPhone or the iPad,
+share a video and choose the "Add to WatchLater" shortcut; it lands here.
+
+Setting that shortcut up, once:
+
+  1. Open Shortcuts and tap + to start a new one.
+  2. Add Action -> search for "Text" -> choose it.
+  3. Tap inside the text box, then tap "Shortcut Input" in the suggestions
+     above the keyboard. The box should hold that one blue variable, nothing
+     else.
+  4. Add Action -> search for "Save File" -> choose it.
+  5. On Save File, open its settings and turn "Ask Where To Save" OFF.
+  6. Tap the destination and pick iCloud Drive -> AMS WatchLater.
+  7. Tap the name at the top -> Details -> turn on "Show in Share Sheet".
+  8. Name it "Add to WatchLater" and tap Done.
+
+It carries over to your other device by itself.
+
+Good to know:
+
+  * The Mac looks in here every thirty seconds while it is awake. If it is
+    asleep or shut, nothing is lost — everything arrives when it wakes.
+  * A file with no link in it is renamed to end in .no-links and kept, never
+    deleted, so you can see what happened.
+  * Photos and other files that are not text are left alone entirely.
+  * This note is ignored, and putting it here is also what makes sure the
+    folder shows up on your phone at all.
+
+This file is rewritten by the app, so there is no point editing it.
+`;
+
 function ensureDrops() {
   if (!dropReady()) return;
   for (const dir of DROPS) {
     try {
-      if (fs.existsSync(path.dirname(dir)) && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+      if (!fs.existsSync(path.dirname(dir))) continue;
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const note = path.join(dir, "Read me.txt");
+      const already = fs.existsSync(note) ? fs.readFileSync(note, "utf8") : "";
+      if (already !== DROP_NOTE) fs.writeFileSync(note, DROP_NOTE);
     } catch (e) {
       /* iCloud not signed in, or the folder cannot be made — nothing to do */
     }
@@ -548,6 +588,7 @@ function dropFiles(dir) {
       .readdirSync(dir)
       .filter((n) => !n.startsWith(".") && !/\.no-links$/i.test(n))
       .filter((n) => !/\.(shortcut|jpe?g|png|heic|gif|mov|mp4|m4v|pdf|zip|dmg)$/i.test(n))
+      .filter((n) => !/^read me/i.test(n))
       .filter((n) => {
         try {
           const st = fs.statSync(path.join(dir, n));

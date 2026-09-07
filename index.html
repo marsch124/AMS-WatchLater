@@ -302,7 +302,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.9</span>
+    <span class="ver" id="ver">v1.10</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -356,7 +356,7 @@
         <br><br>
         <b>Saving from the iPhone or the iPad.</b> Your list lives on this Mac and nothing on the internet can reach it — which is the point, but it does mean the phone cannot simply send it a video. So it does not try to. The phone drops a small file into <b>iCloud Drive</b>, and this Mac picks it up whenever it is next awake. That is deliberate: anything that talks to the Mac directly fails silently the moment the lid is shut, whereas a file just waits.
         <br><br>
-        The folder is <b>iCloud Drive → AMS WatchLater</b>. It already exists on this Mac, and it will appear in <b>Files</b> on the phone and the iPad by itself. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
+        The folder is <b>iCloud Drive → AMS WatchLater</b>. <b>You do not have to make it</b> — this Mac creates it, and it appears in <b>Files</b> on the phone and the iPad by itself. It has a <b>Read me</b> in it with the setup below, partly so the folder explains itself when you find it on the phone, and partly because a completely empty folder is the one thing iCloud may not bother showing you. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
         <br><br>
         <b>Setting up the phone, once.</b> This takes about two minutes and you only do it on one device — Shortcuts carries it over to the other by itself.
         <br>1 — Open <b>Shortcuts</b> and tap <b>+</b> to start a new one.
@@ -439,7 +439,16 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.9</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.10</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li>The drop folder now contains a <b>Read me</b> with the phone setup in it, so it explains itself when you find it in Files.</li>
+            <li>That also makes sure the folder is never empty — an empty folder is the one case iCloud may not show on the phone at all.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> you asked whether you had to make the folder yourself, which is exactly the question anyone would have when told "it is already there" — and an empty folder that may or may not have appeared is a bad thing to be sure about. Now there is something in it, so it definitely shows up, and what is in it tells you what the folder is for and how to set the phone up without coming back to this screen.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.9</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li><b>Save videos from the iPhone and the iPad.</b> Share a video into a Shortcut, and it lands on this list.</li>
             <li>It goes through a folder in <b>iCloud Drive</b>, not over the network, so it works with the MacBook shut — everything waits and arrives when the Mac wakes.</li>
