@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.11";
+const APP_VERSION = "1.12";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -51,13 +51,57 @@ function readConfig() {
 // losing one because it went somewhere unwatched costs his trust in the whole
 // thing.
 const DROP_MAIN = readConfig();
-const DROPS = [
-  DROP_MAIN,
-  path.join(ICLOUD, "com~apple~CloudDocs/AMS WatchLater"),
-  path.join(ICLOUD, "iCloud~is~workflow~my~workflows/Documents/AMS WatchLater"),
-].filter((d, i, all) => all.indexOf(d) === i);
+const DROP_NAME = path.basename(DROP_MAIN);
 const DROP_EVERY = 30000;
 const DROP_MAX_BYTES = 65536;
+const DROP_SCAN_EVERY = 5 * 60 * 1000;
+
+// The Shortcuts app on the phone will not always let you BROWSE to a folder —
+// on some versions the destination is a path you type, and what that path is
+// relative to is not shown anywhere. Rather than make him guess, every folder
+// called "AMS WatchLater" anywhere in iCloud Drive is watched. Wherever the
+// phone actually put it, the link arrives, and he never has to find out why it
+// did not.
+let scanned = { at: 0, dirs: [] };
+
+function scanForDrops() {
+  const roots = [
+    path.join(ICLOUD, "com~apple~CloudDocs"),
+    path.join(ICLOUD, "iCloud~is~workflow~my~workflows/Documents"),
+  ];
+  const skip = /^(node_modules|\.git|Library|Photos Library\.photoslibrary|.*\.app)$/;
+  const found = [];
+  let seen = 0;
+
+  const walk = (dir, depth) => {
+    if (depth > 7 || found.length >= 20 || seen > 20000) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || e.name.startsWith(".") || skip.test(e.name)) continue;
+      seen++;
+      const full = path.join(dir, e.name);
+      if (e.name === DROP_NAME) { found.push(full); continue; }
+      walk(full, depth + 1);
+    }
+  };
+
+  for (const r of roots) if (fs.existsSync(r)) walk(r, 0);
+  return found;
+}
+
+function dropDirs(fresh) {
+  if (fresh || Date.now() - scanned.at > DROP_SCAN_EVERY) {
+    scanned = { at: Date.now(), dirs: scanForDrops() };
+  }
+  return [DROP_MAIN, ...scanned.dirs]
+    .filter((d, i, all) => all.indexOf(d) === i)
+    .filter((d) => fs.existsSync(d));
+}
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -640,7 +684,7 @@ function dropFiles(dir) {
 }
 
 function dropWaiting() {
-  return DROPS.filter(fs.existsSync).reduce((n, d) => n + dropFiles(d).length, 0);
+  return dropDirs().reduce((n, d) => n + dropFiles(d).length, 0);
 }
 
 function linksIn(text) {
@@ -656,14 +700,15 @@ function linksIn(text) {
   return out;
 }
 
-let draining = false;
-async function drainDrops() {
-  if (draining || !dropReady()) return;
-  draining = true;
+let draining = null;
+async function drainDrops(fresh) {
+  while (draining) {
+    try { await draining; } catch (e) { /* the other run reports its own trouble */ }
+  }
+  let done;
+  draining = new Promise((r) => { done = r; });
   try {
-    for (const dir of DROPS) {
-      if (!fs.existsSync(dir)) continue;
-
+    for (const dir of dropDirs(fresh)) {
       let waiting;
       try {
         waiting = fs.readdirSync(dir);
@@ -704,7 +749,8 @@ async function drainDrops() {
   } catch (e) {
     console.error("drop folder:", e.message);
   } finally {
-    draining = false;
+    draining = null;
+    done();
   }
 }
 
@@ -794,6 +840,7 @@ const server = http.createServer(async (req, res) => {
             waiting: dropWaiting(),
             folder: DROP_MAIN.replace(os.homedir(), "~"),
             files: DROP_FILES_PATH.replace(/ -> /g, " \u2192 "),
+            watching: dropDirs().map((d) => filesPath(d).replace(/ -> /g, " \u2192 ")),
           },
         })
       );
@@ -889,8 +936,17 @@ const server = http.createServer(async (req, res) => {
     // another port is allowed to read.
     if (p === "/api/drop" && req.method === "POST") {
       ensureDrops();
-      await drainDrops();
-      return send(res, 200, JSON.stringify({ ok: true, waiting: dropWaiting(), count: liveItems(loadStore()).length }));
+      await drainDrops(true); // look again for the folder itself, not just in it
+      return send(
+        res,
+        200,
+        JSON.stringify({
+          ok: true,
+          waiting: dropWaiting(),
+          count: liveItems(loadStore()).length,
+          watching: dropDirs().map((d) => filesPath(d).replace(/ -> /g, " \u2192 ")),
+        })
+      );
     }
 
     if (p === "/api/stats") {
