@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.12";
+const APP_VERSION = "1.13";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -687,6 +687,29 @@ function dropWaiting() {
   return dropDirs().reduce((n, d) => n + dropFiles(d).length, 0);
 }
 
+function emptyFiles(dir) {
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((n) => !n.startsWith(".") && !/^read me/i.test(n))
+      .filter((n) => {
+        try {
+          const st = fs.statSync(path.join(dir, n));
+          return st.isFile() && st.size === 0;
+        } catch (e) {
+          return false;
+        }
+      })
+      .map((n) => path.join(dir, n));
+  } catch (e) {
+    return [];
+  }
+}
+
+function dropEmpty() {
+  return dropDirs().reduce((n, d) => n + emptyFiles(d).length, 0);
+}
+
 function linksIn(text) {
   const out = [];
   const seen = new Set();
@@ -718,6 +741,17 @@ async function drainDrops(fresh) {
       if (waiting.some((n) => /^\..+\.icloud$/.test(n))) {
         pullDown(dir);
         continue; // try again on the next round, once it has come down
+      }
+
+      // Empty ones are swept once they can no longer be mid-write, but only
+      // after they have been counted, so the page can say what happened.
+      for (const file of emptyFiles(dir)) {
+        try {
+          if (Date.now() - fs.statSync(file).mtimeMs > 120000) {
+            fs.unlinkSync(file);
+            console.log(`drop: ${path.basename(file)} was empty — the shortcut ran with nothing shared`);
+          }
+        } catch (e) {}
       }
 
       for (const name of dropFiles(dir)) {
@@ -838,6 +872,7 @@ const server = http.createServer(async (req, res) => {
           drop: {
             ready: dropReady(),
             waiting: dropWaiting(),
+            empty: dropEmpty(),
             folder: DROP_MAIN.replace(os.homedir(), "~"),
             files: DROP_FILES_PATH.replace(/ -> /g, " \u2192 "),
             watching: dropDirs().map((d) => filesPath(d).replace(/ -> /g, " \u2192 ")),
@@ -943,6 +978,7 @@ const server = http.createServer(async (req, res) => {
         JSON.stringify({
           ok: true,
           waiting: dropWaiting(),
+          empty: dropEmpty(),
           count: liveItems(loadStore()).length,
           watching: dropDirs().map((d) => filesPath(d).replace(/ -> /g, " \u2192 ")),
         })

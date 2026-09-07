@@ -302,7 +302,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.12</span>
+    <span class="ver" id="ver">v1.13</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -372,6 +372,8 @@
         <br><br>
         <b>When they turn up.</b> This Mac looks in the folder every thirty seconds while the engine is running, so a video saved on the phone is usually on the list within a minute of the Mac being awake. If the Mac was asleep or shut, everything you saved lands the next time it wakes. <b>Your data</b> below shows whether the folder is ready and how many files are waiting, and has a <b>Look in the phone folder now</b> button if you would rather not wait.
         <br><br>
+        <b>If a file turns up empty.</b> A file with nothing in it means the shortcut ran without being given a video — which is what happens if you test it with the <b>play button inside Shortcuts</b> rather than by sharing. It has to be run from the <b>Share</b> sheet of a video. The app says so when it sees one, and clears it away after a couple of minutes.
+        <br><br>
         <b>If something does not arrive.</b> Almost always the Mac was asleep — wake it, open this app, and it will be there. If a file is sitting in the folder with <b>.no-links</b> on the end, there was no link in it: open it on the phone and check what the share sheet actually put in. And if the link ended up somewhere else, it is almost certainly covered: this Mac watches <b>every</b> folder called <b>AMS WatchLater</b> anywhere in iCloud Drive, not only yours. Shortcuts on the phone does not always let you browse to a folder — sometimes it gives you a path to type and does not say what that path is measured from — so rather than have you guess, anything by that name is looked in. Catching a link in the wrong place costs nothing; losing one would cost you your trust in the whole thing.
         <br><br>
         <b>One direction only.</b> This sends videos to the Mac; it does not put the list on your phone. Watching, ticking off and everything else still happens here.
@@ -439,7 +441,16 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.12</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.13</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li>An empty file arriving from the phone is now explained rather than ignored — it means the shortcut was run without a video being shared.</li>
+            <li>Empty files are cleared away by themselves once they can no longer be half-written.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> the first thing anyone does with a new shortcut is press play to see if it works — and that gives it nothing to save, so it writes an empty file. The app used to skip those without a word, which meant the folder said "something happened here" and the app said "nothing waiting", which is the most confusing pair of answers it could give. Now it tells you exactly what happened and what to do instead.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.12</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li>Every folder called <b>AMS WatchLater</b> anywhere in iCloud Drive is now watched, not only yours.</li>
             <li><b>Look in the phone folder now</b> looks for the folder itself as well as in it, so a folder made seconds ago on the phone is found straight away.</li>
@@ -1403,9 +1414,13 @@ function paintDrop(){
     line.textContent = "iCloud Drive folder not found — see How this works.";
     return;
   }
-  line.textContent = drop.waiting
-    ? `${drop.waiting} file${drop.waiting === 1 ? "" : "s"} waiting to come in.`
-    : "Ready. Nothing waiting.";
+  if (drop.waiting){
+    line.textContent = `${drop.waiting} file${drop.waiting === 1 ? "" : "s"} waiting to come in.`;
+  } else if (drop.empty){
+    line.textContent = "A file arrived but was empty — run the shortcut by sharing a video, not with the play button inside Shortcuts.";
+  } else {
+    line.textContent = "Ready. Nothing waiting.";
+  }
 }
 
 async function patch(id, change){
@@ -1523,10 +1538,15 @@ $("dropbtn").onclick = async () => {
     await fetch("/api/drop", { method:"POST" });
     await load();
     const got = items.length - before;
-    $("dropline").textContent = got > 0
-      ? `${got} video${got === 1 ? "" : "s"} came in from the phone.`
-      : (drop && drop.waiting ? `${drop.waiting} still waiting — iCloud may not have brought them down yet.`
-                              : "Nothing waiting.");
+    if (got > 0){
+      $("dropline").textContent = `${got} video${got === 1 ? "" : "s"} came in from the phone.`;
+    } else if (drop && drop.waiting){
+      $("dropline").textContent = `${drop.waiting} still waiting — iCloud may not have brought them down yet.`;
+    } else if (drop && drop.empty){
+      $("dropline").textContent = "A file arrived from the phone but was empty. That happens when the shortcut is run with the play button inside Shortcuts, which gives it no video — share one from YouTube instead.";
+    } else {
+      $("dropline").textContent = "Nothing waiting.";
+    }
   } catch(e){
     $("dropline").textContent = "Could not reach the engine.";
   } finally {
