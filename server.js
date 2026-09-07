@@ -9,14 +9,31 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { execFile } = require("child_process");
 
 const APP_DIR = __dirname;
 const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.8";
+const APP_VERSION = "1.9";
+
+// Saving from the iPhone or the iPad. There is no server the phone can reach —
+// this engine answers to this Mac only, and a MacBook with its lid shut answers
+// to nothing at all. So the phone does not talk to the Mac: it drops a small
+// file into iCloud Drive, and the Mac picks it up whenever it is awake.
+// Both places are watched because Shortcuts saves either into iCloud Drive
+// itself or into its own Shortcuts folder, depending on where the destination
+// is picked, and being wrong about that would look exactly like it not working.
+const ICLOUD = path.join(os.homedir(), "Library/Mobile Documents");
+const DROPS = [
+  path.join(ICLOUD, "com~apple~CloudDocs/AMS WatchLater"),
+  path.join(ICLOUD, "iCloud~is~workflow~my~workflows/Documents/AMS WatchLater"),
+];
+const DROP_EVERY = 30000;
+const DROP_MAX_BYTES = 65536;
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
@@ -460,6 +477,159 @@ function cleanTags(raw) {
   return out;
 }
 
+// Everything that adds — the paste box, the Dock app, the phone's drop folder —
+// comes through here, so a playlist behaves the same way whichever door it
+// arrives at.
+async function addMany(store, rawUrls) {
+  let fromPlaylist = 0;
+  const jobs = [];
+  for (const u of rawUrls) {
+    const full = /^https?:\/\//i.test(u) ? u : "https://" + u;
+    // Only a BARE playlist link fans out. A watch link that happens to carry
+    // &list= is still the one video he was looking at.
+    const list = !videoId(full) && playlistId(full);
+    if (!list) { jobs.push({ url: u }); continue; }
+    try {
+      const vids = await playlistVideos(list);
+      // Added last-first, so the playlist's own first video ends up on top.
+      for (const v of vids.reverse()) {
+        jobs.push({ url: `https://www.youtube.com/watch?v=${v.id}`, hint: v });
+      }
+      fromPlaylist += vids.length;
+    } catch (e) {
+      jobs.push({ url: u });
+    }
+  }
+
+  const added = [], dupes = [], failed = [];
+  for (const job of jobs) {
+    try {
+      const r = await addOne(store, job.url, job.hint);
+      if (!r.ok) failed.push(job.url);
+      else if (r.duplicate) dupes.push(r.item.title);
+      else added.push(r.item.title);
+    } catch (e) {
+      failed.push(job.url);
+    }
+  }
+  return { added, dupes, failed, fromPlaylist };
+}
+
+/* ---------- the drop folder ---------- */
+
+function dropReady() {
+  return fs.existsSync(ICLOUD);
+}
+
+function ensureDrops() {
+  if (!dropReady()) return;
+  for (const dir of DROPS) {
+    try {
+      if (fs.existsSync(path.dirname(dir)) && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (e) {
+      /* iCloud not signed in, or the folder cannot be made — nothing to do */
+    }
+  }
+}
+
+// A file still sitting in the cloud shows up as a hidden ".name.icloud"
+// placeholder with none of the content in it. Reading that would find no links
+// and quietly throw the video away, so it is pulled down first and left for the
+// next round instead.
+function pullDown(dir) {
+  execFile("/usr/bin/brctl", ["download", dir], () => {});
+}
+
+function dropFiles(dir) {
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((n) => !n.startsWith(".") && !/\.no-links$/i.test(n))
+      .filter((n) => !/\.(shortcut|jpe?g|png|heic|gif|mov|mp4|m4v|pdf|zip|dmg)$/i.test(n))
+      .filter((n) => {
+        try {
+          const st = fs.statSync(path.join(dir, n));
+          return st.isFile() && st.size > 0 && st.size <= DROP_MAX_BYTES;
+        } catch (e) {
+          return false;
+        }
+      });
+  } catch (e) {
+    return [];
+  }
+}
+
+function dropWaiting() {
+  return DROPS.filter(fs.existsSync).reduce((n, d) => n + dropFiles(d).length, 0);
+}
+
+function linksIn(text) {
+  const out = [];
+  const seen = new Set();
+  const re = /(?:https?:\/\/|(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/)[^\s"'<>)\]]+/gi;
+  for (const m of String(text || "").matchAll(re)) {
+    const u = m[0].replace(/[.,;]+$/, "");
+    if (seen.has(u)) continue;
+    seen.add(u);
+    out.push(u);
+  }
+  return out;
+}
+
+let draining = false;
+async function drainDrops() {
+  if (draining || !dropReady()) return;
+  draining = true;
+  try {
+    for (const dir of DROPS) {
+      if (!fs.existsSync(dir)) continue;
+
+      let waiting;
+      try {
+        waiting = fs.readdirSync(dir);
+      } catch (e) {
+        continue;
+      }
+      if (waiting.some((n) => /^\..+\.icloud$/.test(n))) {
+        pullDown(dir);
+        continue; // try again on the next round, once it has come down
+      }
+
+      for (const name of dropFiles(dir)) {
+        const file = path.join(dir, name);
+        let text;
+        try {
+          text = fs.readFileSync(file, "utf8");
+        } catch (e) {
+          continue;
+        }
+        const urls = linksIn(text);
+        if (!urls.length) {
+          // Never delete something that might have been meant for the list.
+          try { fs.renameSync(file, file + ".no-links"); } catch (e) {}
+          console.log(`drop: no links in ${name} — left as ${name}.no-links`);
+          continue;
+        }
+        const store = loadStore();
+        purgeDeleted(store);
+        const r = await addMany(store, urls);
+        if (r.added.length) saveStore(store);
+        // Only once the list is safely written is the dropped file removed.
+        try { fs.unlinkSync(file); } catch (e) {}
+        console.log(
+          `drop: ${name} — ${r.added.length} added, ${r.dupes.length} already there, ${r.failed.length} unreadable`
+        );
+      }
+    }
+  } catch (e) {
+    console.error("drop folder:", e.message);
+  } finally {
+    draining = false;
+  }
+}
+
 /* ---------- http ---------- */
 
 // AMS Main Hub reads /health to fill in this app's version chip, and it is
@@ -503,7 +673,7 @@ const server = http.createServer(async (req, res) => {
   // A page in the browser must not be able to add to or empty the list just by
   // knowing the port. Requests carrying no Origin at all are the app's own
   // tools — the Dock button, the shortcut, curl — and those are fine.
-  const WRITES = ["/api/add", "/api/update", "/api/delete", "/api/backup", "/api/restore", "/api/refresh"];
+  const WRITES = ["/api/add", "/api/update", "/api/delete", "/api/backup", "/api/restore", "/api/refresh", "/api/drop"];
   if (WRITES.includes(p) && origin && origin !== `http://localhost:${PORT}` && origin !== `http://127.0.0.1:${PORT}`) {
     return send(res, 403, JSON.stringify({ ok: false, error: "origin not allowed" }));
   }
@@ -535,7 +705,19 @@ const server = http.createServer(async (req, res) => {
       // version happened to be stamped in the data file the last time it was
       // written — otherwise a fresh release keeps displaying the old number.
       const store = loadStore();
-      return send(res, 200, JSON.stringify({ version: APP_VERSION, items: liveItems(store) }));
+      return send(
+        res,
+        200,
+        JSON.stringify({
+          version: APP_VERSION,
+          items: liveItems(store),
+          drop: {
+            ready: dropReady() && DROPS.some(fs.existsSync),
+            waiting: dropWaiting(),
+            folders: DROPS.map((d) => ({ path: d.replace(os.homedir(), "~"), exists: fs.existsSync(d) })),
+          },
+        })
+      );
     }
 
     // The capture endpoint. "Add to WatchLater.app" and the Shortcut both
@@ -557,43 +739,9 @@ const server = http.createServer(async (req, res) => {
       urls = urls.filter(Boolean);
       if (!urls.length) return send(res, 400, JSON.stringify({ ok: false, error: "no url" }));
 
-      // Only a bare playlist link fans out. A watch link that happens to carry
-      // &list= is still the one video he was looking at, which is how it has
-      // always behaved and must keep behaving.
-      let fromPlaylist = 0;
-      const expanded = [];
-      for (const u of urls) {
-        const full = /^https?:\/\//i.test(u) ? u : "https://" + u;
-        const list = !videoId(full) && playlistId(full);
-        if (!list) { expanded.push({ url: u }); continue; }
-        try {
-          const vids = await playlistVideos(list);
-          // Added last-first, so the playlist's own first video ends up on top.
-          for (const v of vids.reverse()) {
-            expanded.push({ url: `https://www.youtube.com/watch?v=${v.id}`, hint: v });
-          }
-          fromPlaylist += vids.length;
-        } catch (e) {
-          expanded.push({ url: u });
-        }
-      }
-      urls = expanded;
-
       const store = loadStore();
       purgeDeleted(store);
-      const added = [];
-      const dupes = [];
-      const failed = [];
-      for (const u of urls) {
-        try {
-          const r = await addOne(store, u.url, u.hint);
-          if (!r.ok) failed.push(u.url);
-          else if (r.duplicate) dupes.push(r.item.title);
-          else added.push(r.item.title);
-        } catch (e) {
-          failed.push(u.url);
-        }
-      }
+      const { added, dupes, failed, fromPlaylist } = await addMany(store, urls);
       if (added.length) saveStore(store);
 
       // "Add to WatchLater.app" asks for fmt=text so it can put the answer
@@ -660,6 +808,12 @@ const server = http.createServer(async (req, res) => {
     // For the Main Hub's tile. Numbers only — no titles, no links, nothing that
     // says WHAT he is watching, since this is the one answer another page on
     // another port is allowed to read.
+    if (p === "/api/drop" && req.method === "POST") {
+      ensureDrops();
+      await drainDrops();
+      return send(res, 200, JSON.stringify({ ok: true, waiting: dropWaiting(), count: liveItems(loadStore()).length }));
+    }
+
     if (p === "/api/stats") {
       const live = liveItems(loadStore());
       const open = live.filter((it) => !it.watchedAt);
@@ -766,5 +920,13 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "127.0.0.1", () => {
   const store = loadStore();
   if (purgeDeleted(store)) saveStore(store);
+  ensureDrops();
+  drainDrops();
+  setInterval(drainDrops, DROP_EVERY);
   console.log(`AMS WatchLater v${APP_VERSION} — http://localhost:${PORT}`);
+  console.log(
+    dropReady()
+      ? `watching for links from the phone every ${DROP_EVERY / 1000}s`
+      : "iCloud Drive not found — the phone drop folder is off"
+  );
 });

@@ -302,7 +302,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.8</span>
+    <span class="ver" id="ver">v1.9</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -353,6 +353,28 @@
         <br><b>4 — Drag and drop.</b> Pull a link from anywhere onto this window.
         <br><br>
         <b>A whole playlist in one go.</b> Paste a <b>playlist</b> link — the kind that is only <i>…/playlist?list=…</i>, with no single video in it — and every video in it is read off the playlist page and added, in the playlist's own order, up to sixty. A normal video link that happens to carry a playlist on the end still saves just the video you were watching, which is how it has always worked.
+        <br><br>
+        <b>Saving from the iPhone or the iPad.</b> Your list lives on this Mac and nothing on the internet can reach it — which is the point, but it does mean the phone cannot simply send it a video. So it does not try to. The phone drops a small file into <b>iCloud Drive</b>, and this Mac picks it up whenever it is next awake. That is deliberate: anything that talks to the Mac directly fails silently the moment the lid is shut, whereas a file just waits.
+        <br><br>
+        The folder is <b>iCloud Drive → AMS WatchLater</b>. It already exists on this Mac, and it will appear in <b>Files</b> on the phone and the iPad by itself. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
+        <br><br>
+        <b>Setting up the phone, once.</b> This takes about two minutes and you only do it on one device — Shortcuts carries it over to the other by itself.
+        <br>1 — Open <b>Shortcuts</b> and tap <b>+</b> to start a new one.
+        <br>2 — Tap <b>Add Action</b>, search for <b>Text</b>, and choose it.
+        <br>3 — Tap inside the text box, then tap <b>Shortcut Input</b> in the row of suggestions above the keyboard. The box should now contain that one blue variable and nothing else.
+        <br>4 — Tap <b>Add Action</b> again, search for <b>Save File</b>, and choose it.
+        <br>5 — On the Save File action, tap the little arrow to open its settings and turn <b>Ask Where To Save</b> <b>off</b>.
+        <br>6 — Tap the destination it then shows and pick <b>iCloud Drive → AMS WatchLater</b>.
+        <br>7 — Tap the shortcut's name at the top, then <b>Details</b>, and turn on <b>Show in Share Sheet</b>. Leave the accepted types as they are.
+        <br>8 — Name it <b>Add to WatchLater</b> and tap <b>Done</b>.
+        <br><br>
+        <b>Using it.</b> In the YouTube app, or in Safari on a video, tap <b>Share</b> and choose <b>Add to WatchLater</b>. That is the whole thing. Save as many as you like, on a train with no signal if you want — they queue up and arrive together.
+        <br><br>
+        <b>When they turn up.</b> This Mac looks in the folder every thirty seconds while the engine is running, so a video saved on the phone is usually on the list within a minute of the Mac being awake. If the Mac was asleep or shut, everything you saved lands the next time it wakes. <b>Your data</b> below shows whether the folder is ready and how many files are waiting, and has a <b>Look in the phone folder now</b> button if you would rather not wait.
+        <br><br>
+        <b>If something does not arrive.</b> Almost always the Mac was asleep — wake it, open this app, and it will be there. If a file is sitting in the folder with <b>.no-links</b> on the end, there was no link in it: open it on the phone and check what the share sheet actually put in. And if you saved from Shortcuts into its own folder rather than the one above, that is covered too — this Mac watches <b>iCloud Drive → Shortcuts → AMS WatchLater</b> as well.
+        <br><br>
+        <b>One direction only.</b> This sends videos to the Mac; it does not put the list on your phone. Watching, ticking off and everything else still happens here.
         <br><br>
         <b>The row of buttons is the whole idea.</b> You almost never want to know what you saved on Tuesday. You want to know what fits in the twenty minutes you actually have. Click a time and the list shows only videos that fit inside it. <b>Everything</b> shows the lot. That one change is what turns a saved list into something you open.
         <br><br>
@@ -405,6 +427,10 @@
           <button id="bkbtn">Back up now</button>
           <span class="dataline" id="dataline"></span>
         </div>
+        <div class="dataact">
+          <button id="dropbtn">Look in the phone folder now</button>
+          <span class="dataline" id="dropline"></span>
+        </div>
         <div class="bklist" id="bklist"></div>
       </div>
     </details>
@@ -413,7 +439,18 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.8</span><span class="reldate">4 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.9</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Save videos from the iPhone and the iPad.</b> Share a video into a Shortcut, and it lands on this list.</li>
+            <li>It goes through a folder in <b>iCloud Drive</b>, not over the network, so it works with the MacBook shut — everything waits and arrives when the Mac wakes.</li>
+            <li>A dropped file with no link in it is renamed rather than deleted, and never lost.</li>
+            <li><b>Your data</b> shows whether the folder is ready, how many files are waiting, and can look right now instead of on the half minute.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> this closes the hole the whole app was built around. Saving a video was only ever free at the Mac — but you watch YouTube on the phone, which is exactly where the thought "I should keep this" happens, and where it was costing you a left-open tab again. It goes through iCloud rather than talking to the Mac because a MacBook with its lid shut answers nothing at all, and a way of saving that silently fails half the time is worse than none: you would stop trusting it within a week. A file just waits. See <b>How this works</b> for the two-minute setup on the phone.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.8</span><span class="reldate">4 September 2026</span></div>
           <ul>
             <li>A <b>WATCH LATER tile on the Main Hub</b> — how many are waiting, and how many fit in five minutes.</li>
             <li>The hub can ask for those counts and nothing else: no titles, no links, and only from the hub's own addresses.</li>
@@ -546,6 +583,7 @@ let view = "cards";
 // window regaining focus reloads the list, and that would wipe the box
 // mid-sentence.
 let editing = 0;
+let drop = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -1317,8 +1355,23 @@ async function load(){
   const r = await fetch("/api/list", { cache:"no-store" });
   const d = await r.json();
   items = d.items || [];
+  drop = d.drop || null;
   if (d.version) $("ver").textContent = "v" + d.version;
+  paintDrop();
   render();
+}
+
+// What the phone folder is doing, in the one place he would look for it.
+function paintDrop(){
+  const line = $("dropline");
+  if (!line) return;
+  if (!drop || !drop.ready){
+    line.textContent = "iCloud Drive folder not found — see How this works.";
+    return;
+  }
+  line.textContent = drop.waiting
+    ? `${drop.waiting} file${drop.waiting === 1 ? "" : "s"} waiting to come in.`
+    : "Ready. Nothing waiting.";
 }
 
 async function patch(id, change){
@@ -1422,6 +1475,26 @@ $("bkbtn").onclick = async () => {
     paintBackups(d.backups || []);
   } catch(e){
     $("dataline").textContent = "Could not reach the engine.";
+  } finally {
+    b.disabled = false;
+  }
+};
+
+$("dropbtn").onclick = async () => {
+  const b = $("dropbtn");
+  b.disabled = true;
+  $("dropline").textContent = "Looking…";
+  try{
+    const before = items.length;
+    await fetch("/api/drop", { method:"POST" });
+    await load();
+    const got = items.length - before;
+    $("dropline").textContent = got > 0
+      ? `${got} video${got === 1 ? "" : "s"} came in from the phone.`
+      : (drop && drop.waiting ? `${drop.waiting} still waiting — iCloud may not have brought them down yet.`
+                              : "Nothing waiting.");
+  } catch(e){
+    $("dropline").textContent = "Could not reach the engine.";
   } finally {
     b.disabled = false;
   }
