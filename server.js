@@ -545,6 +545,21 @@ function dropReady() {
   return fs.existsSync(DROP_MAIN);
 }
 
+// The same folder written the way the Files app shows it on the phone, so the
+// instructions can name it without the path being baked into public code.
+function filesPath(dir) {
+  const home = os.homedir();
+  const icloud = path.join(ICLOUD, "com~apple~CloudDocs");
+  let rest;
+  if (dir.startsWith(icloud + path.sep)) rest = dir.slice(icloud.length + 1);
+  else if (dir.startsWith(path.join(home, "Documents") + path.sep)) rest = "Documents/" + dir.slice(path.join(home, "Documents").length + 1);
+  else if (dir.startsWith(path.join(home, "Desktop") + path.sep)) rest = "Desktop/" + dir.slice(path.join(home, "Desktop").length + 1);
+  else return dir.replace(home, "~");
+  return "iCloud Drive -> " + rest.split(path.sep).join(" -> ");
+}
+
+const DROP_FILES_PATH = filesPath(DROP_MAIN);
+
 const DROP_NOTE = `AMS WatchLater — the drop folder
 ==================================
 
@@ -565,7 +580,7 @@ Setting that shortcut up, once:
   4. Add Action -> search for "Save File" -> choose it.
   5. On Save File, open its settings and turn "Ask Where To Save" OFF.
   6. Tap the destination and pick the folder this note is sitting in:
-     iCloud Drive -> Documents -> 03 Home -> 02 IT -> 01 SW -> AMS WatchLater
+     ${DROP_FILES_PATH}
   7. Tap the name at the top -> Details -> turn on "Show in Share Sheet".
   8. Name it "Add to WatchLater" and tap Done.
 
@@ -778,6 +793,7 @@ const server = http.createServer(async (req, res) => {
             ready: dropReady(),
             waiting: dropWaiting(),
             folder: DROP_MAIN.replace(os.homedir(), "~"),
+            files: DROP_FILES_PATH.replace(/ -> /g, " \u2192 "),
           },
         })
       );

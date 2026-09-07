@@ -356,7 +356,7 @@
         <br><br>
         <b>Saving from the iPhone or the iPad.</b> Your list lives on this Mac and nothing on the internet can reach it — which is the point, but it does mean the phone cannot simply send it a video. So it does not try to. The phone drops a small file into <b>iCloud Drive</b>, and this Mac picks it up whenever it is next awake. That is deliberate: anything that talks to the Mac directly fails silently the moment the lid is shut, whereas a file just waits.
         <br><br>
-        The folder sits with your other AMS folders, at <b>01 SW → AMS WatchLater</b>. On the phone that is <b>Files → iCloud Drive → Documents → 03 Home → 02 IT → 01 SW → AMS WatchLater</b>. <b>You do not have to make it</b> — this Mac creates it, and it has a <b>Read me</b> in it carrying the setup below, partly so the folder explains itself when you find it on the phone, and partly because a completely empty folder is the one thing iCloud may not bother showing you. Which folder it is lives in a small <b>config.json</b> beside the app, so moving it later is one line and nothing personal sits in the public code. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
+        The folder sits with your other AMS folders. On the phone it is <b class="dpath">the drop folder</b>, under <b>Files</b>. <b>You do not have to make it</b> — this Mac creates it, and it has a <b>Read me</b> in it carrying the setup below, partly so the folder explains itself when you find it on the phone, and partly because a completely empty folder is the one thing iCloud may not bother showing you. Which folder it is lives in a small <b>config.json</b> beside the app, so moving it later is one line and nothing personal sits in the public code. Anything you put in it that contains a link is added to the list and the file is then removed. A file with no link in it is <b>never</b> thrown away — it is renamed to end in <b>.no-links</b> and left there for you to look at.
         <br><br>
         <b>Setting up the phone, once.</b> This takes about two minutes and you only do it on one device — Shortcuts carries it over to the other by itself.
         <br>1 — Open <b>Shortcuts</b> and tap <b>+</b> to start a new one.
@@ -364,7 +364,7 @@
         <br>3 — Tap inside the text box, then tap <b>Shortcut Input</b> in the row of suggestions above the keyboard. The box should now contain that one blue variable and nothing else.
         <br>4 — Tap <b>Add Action</b> again, search for <b>Save File</b>, and choose it.
         <br>5 — On the Save File action, tap the little arrow to open its settings and turn <b>Ask Where To Save</b> <b>off</b>.
-        <br>6 — Tap the destination it then shows and pick <b>iCloud Drive → Documents → 03 Home → 02 IT → 01 SW → AMS WatchLater</b>.
+        <br>6 — Tap the destination it then shows and pick <b class="dpath">the drop folder</b>.
         <br>7 — Tap the shortcut's name at the top, then <b>Details</b>, and turn on <b>Show in Share Sheet</b>. Leave the accepted types as they are.
         <br>8 — Name it <b>Add to WatchLater</b> and tap <b>Done</b>.
         <br><br>
@@ -1382,6 +1382,11 @@ async function load(){
 
 // What the phone folder is doing, in the one place he would look for it.
 function paintDrop(){
+  // The folder is whatever config.json says, so the guide is told at run time
+  // rather than having his filing system written into a public file.
+  if (drop && drop.files){
+    for (const el of document.querySelectorAll(".dpath")) el.textContent = drop.files;
+  }
   const line = $("dropline");
   if (!line) return;
   if (!drop || !drop.ready){
