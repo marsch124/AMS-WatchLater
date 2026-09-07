@@ -18,7 +18,7 @@ const PORT = 7821;
 const STORE = path.join(APP_DIR, "watchlater.json");
 const BACKUPS = path.join(APP_DIR, "backups");
 const THUMBS = path.join(APP_DIR, "thumbs");
-const APP_VERSION = "1.13";
+const APP_VERSION = "1.14";
 
 // Saving from the iPhone or the iPad. There is no server the phone can reach —
 // this engine answers to this Mac only, and a MacBook with its lid shut answers
@@ -516,6 +516,7 @@ async function addOne(store, rawUrl, hint) {
     watchedAt: null,
     keptAt: null,
     pinnedAt: null,
+    togetherAt: null,
     deletedAt: null,
     startedAt: null,
     answeredAt: null,
@@ -940,6 +941,7 @@ const server = http.createServer(async (req, res) => {
         if ("seconds" in j) item.seconds = j.seconds == null ? null : +j.seconds;
         if ("note" in j) item.note = String(j.note || "").slice(0, 500);
         if ("pin" in j) item.pinnedAt = j.pin ? now : null;
+        if ("together" in j) item.togetherAt = j.together ? now : null;
         if ("started" in j) item.startedAt = j.started ? now : null;
         if ("answered" in j) item.answeredAt = j.answered ? now : null;
         if ("tags" in j) item.tags = cleanTags(j.tags);

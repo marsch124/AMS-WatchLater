@@ -34,6 +34,10 @@
     --amber:#9a6b12; --amber-soft:#f7edd8; --amber-line:#e3cd9b;
     --shade:#efece4;
   }
+  :root{ --pair:#8a5a8f; --pair-soft:#f1e6f3; --pair-line:#d3b6d8; }
+  @media (prefers-color-scheme: dark){
+    :root{ --pair:#c79bcd; --pair-soft:#332738; --pair-line:#4d3a52; }
+  }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#1b1a18; --card:#242320; --ink:#eeebe4; --muted:#a09b91; --line:#38352f;
@@ -89,6 +93,8 @@
   .pill:hover{border-color:var(--muted)}
   .pill.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:500}
   .pill.on .n{color:var(--accent)}
+  .pill.pairpill.on{background:var(--pair-soft); border-color:var(--pair-line); color:var(--pair)}
+  .pill.pairpill.on .n{color:var(--pair)}
 
   .search{
     display:flex; align-items:center; gap:7px; height:33px; padding:0 10px;
@@ -145,6 +151,8 @@
   }
   .card.stale{border-color:var(--amber-line)}
   .card.pinned{border-color:var(--accent)}
+  .card.together{border-color:var(--pair-line)}
+  .card.pinned.together{border-color:var(--accent)}
   .card.done{opacity:.62}
   .thumb{
     position:relative; display:block; aspect-ratio:16/9; background:var(--shade);
@@ -178,6 +186,25 @@
   .pin:hover{background:rgba(20,18,15,.92); border:0}
   .pin.on{opacity:1; background:var(--accent)}
   .pin.on:hover{background:var(--accent); opacity:.85}
+
+  .pair{
+    position:absolute; left:7px; bottom:7px; width:27px; height:27px; padding:0;
+    border:0; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,18,15,.68); color:#fff; cursor:pointer;
+    opacity:0; transition:opacity .12s;
+  }
+  .card:hover .pair{opacity:1}
+  .pair:hover{background:rgba(20,18,15,.92); border:0}
+  .pair.on{opacity:1; background:var(--pair)}
+  .pair.on:hover{background:var(--pair); opacity:.85}
+  .grid.compact .pair{width:22px; height:22px; left:4px; bottom:4px}
+
+  .bulk.pairbar{background:var(--pair-soft); border-color:var(--pair-line); color:var(--pair)}
+  .pairout{
+    width:100%; margin:4px 0 0; padding:9px 11px; resize:vertical; min-height:64px;
+    font:13px/1.5 ui-monospace,Menlo,monospace; color:var(--ink); background:var(--card);
+    border:1px solid var(--pair-line); border-radius:9px; outline:none;
+  }
 
   .body{padding:9px 11px 10px; display:flex; flex-direction:column; flex:1; gap:4px}
   .ttl{font-size:14px; font-weight:500; line-height:1.34; margin:0; cursor:pointer}
@@ -302,7 +329,7 @@
 
   <header>
     <h1>WatchLater</h1>
-    <span class="ver" id="ver">v1.13</span>
+    <span class="ver" id="ver">v1.14</span>
     <span class="spacer"></span>
     <span class="tally" id="tally"></span>
   </header>
@@ -323,6 +350,7 @@
       <input id="q" type="text" placeholder="Search" autocomplete="off" spellcheck="false">
       <button class="clr" id="qclr" title="Clear" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.4 7.2c3.2 3.1 6.3 6.1 9.4 9M16.7 7.2c-3.2 3.1-6.3 6.1-9.4 9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     </div>
+    <button class="pill pairpill" id="pairbtn" hidden></button>
     <button class="pill" id="watchedbtn"></button>
   </div>
 
@@ -336,6 +364,7 @@
     <span class="views" id="views"></span>
   </div>
 
+  <div class="bulk pairbar" id="pairbar" hidden></div>
   <div class="bulk" id="bulk" hidden></div>
 
   <div class="grid" id="grid"></div>
@@ -394,6 +423,12 @@
         <br><br>
         <b>Checking a card is still true.</b> Titles get rewritten, videos get made private, thumbnails get swapped. Pick one or several with the tick box and press <b>Check</b> in the green bar: the app asks YouTube again and brings the title, channel, length and picture up to date. Anything that has been taken down is marked <b>Not on YouTube any more</b> in amber rather than deleted — throwing it away is your decision, not the app's.
         <br><br>
+        <b>Watching something together.</b> The two little figures in the bottom-left corner of a picture mark a video as one to watch <b>with someone else</b>. Mark a few and a <b>Together</b> button appears at the top; press it and the list narrows to those, with a purple bar above it.
+        <br><br>
+        That bar does the useful part. <b>Copy a link that plays them</b> gives you a <b>single YouTube link</b> that plays every marked video, one after another — send it to her phone, open it on the iPad, put it on the television. <b>Copy a message to send</b> gives you the same thing written out to paste into Messages or WhatsApp: the titles numbered with their lengths, so she can pick one, and the link underneath in case she would rather just press play. Neither button sends anything anywhere — it goes on your clipboard and you decide where it goes.
+        <br><br>
+        The same link trick works on anything you pick with the tick boxes: choose four videos and press <b>Make a link</b> in the green bar. That is also the simplest way to get a few of these onto your phone or the television without the app being there at all.
+        <br><br>
         <b>Finding one particular video.</b> Type into the <b>Search</b> box, top right. It looks at titles and channel names as you type, and it ignores accents — <i>hjarnans</i> finds <i>hjärnans</i>, <i>kaffet</i> finds <i>En AI till Kaffet</i>. Because you are now looking for one thing rather than asking what fits in twenty minutes, the row opens up to <b>Everything</b> on its own, so the video cannot be hiding behind a slot that is too short. Escape, or the little cross, clears it.
         <br><br>
         <b>Only this channel.</b> Click the channel name under any title — <i>Raycast</i>, <i>Big Think</i> — and the list narrows to that channel alone, with its name shown as a green tag under <b>Sort</b>. Click the tag to go back to everything. It is the quickest way to line up three videos from the same person and take them in one sitting.
@@ -441,7 +476,17 @@
       <div>
 
         <div class="rel now">
-          <div class="relhead"><span class="relno">v1.13</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <div class="relhead"><span class="relno">v1.14</span><span class="reldate">7 September 2026</span><span class="reltag">current</span></div>
+          <ul>
+            <li><b>Together</b> — mark a video as one to watch with someone else, with the two figures on its picture, and a Together button to see just those.</li>
+            <li><b>One link that plays them all.</b> Any set — the Together ones, or anything you tick — becomes a single YouTube link that plays them in order on any screen.</li>
+            <li><b>A message ready to paste</b>: the titles numbered with their lengths, and that link underneath.</li>
+          </ul>
+          <p class="why"><b>Why it helps you:</b> you wanted a way to ask which of these she would watch with you, and a tick box on its own would only have told <i>you</i> something. The link is what makes it work: she does not need this app, or a list, or even to choose — she can read three titles and pick one, or press play and let it run. It is the first thing this app does that leaves the Mac. And the same link is the easiest way yet to carry a few videos to the television or the iPad, which is where you would actually watch an hour of golf.</p>
+        </div>
+
+        <div class="rel">
+          <div class="relhead"><span class="relno">v1.13</span><span class="reldate">7 September 2026</span></div>
           <ul>
             <li>An empty file arriving from the phone is now explained rather than ignored — it means the shortcut was run without a video being shared.</li>
             <li>Empty files are cleared away by themselves once they can no longer be half-written.</li>
@@ -616,6 +661,7 @@ let showWatched = false;
 let query = "";
 let channel = null;
 let tag = null;
+let together = false;
 const picked = new Set();
 let sortBy = "new";
 let view = "cards";
@@ -676,6 +722,56 @@ function fmtTotal(list){
   return `${videos} · ${time}${known.length < n ? " +" : ""}`;
 }
 
+// YouTube will build a playlist out of a bare list of video ids and redirect to
+// it, so any handful of these can become ONE link that plays them in order on
+// her phone, the iPad or the television. That is what makes this useful rather
+// than just a list of titles.
+function playlistLink(list){
+  const ids = list.filter((it) => it.videoId).map((it) => it.videoId).slice(0, 50);
+  return ids.length ? "https://www.youtube.com/watch_videos?video_ids=" + ids.join(",") : null;
+}
+
+function roughLength(secs){
+  if (secs == null) return null;
+  if (secs < 60) return `${secs} sec`;
+  const m = Math.round(secs / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+
+// Titles first, because she is choosing; the link last, because it is the bit
+// she presses if she does not want to choose at all.
+function shortlistText(list){
+  const lines = ["Fancy watching one of these together?", ""];
+  list.forEach((it, i) => {
+    const len = roughLength(it.seconds);
+    lines.push(`${i + 1}. ${it.title}${len ? " — " + len : ""}`);
+  });
+  const link = playlistLink(list);
+  if (link) lines.push("", "Or all of them, in order:", link);
+  return lines.join("\n");
+}
+
+async function copyText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch(e){
+    // Safari can refuse the clipboard API; the old way still works from a click
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try{ ok = document.execCommand("copy"); } catch(e2){}
+    ta.remove();
+    return ok;
+  }
+}
+
 function short(t, n = 40){
   t = String(t || "");
   return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
@@ -699,6 +795,9 @@ function icon(name, size = 17){
     film:  '<rect x="3.6" y="6.2" width="16.8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.4 6.4v11.6M15.6 6.4v11.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
     pin:   '<path d="M9 4.1c2-.5 4-.5 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10.3 4.5c.3 2.6-.5 4.7-2.4 6.3 2.8.7 5.5.7 8.2 0-1.9-1.6-2.7-3.7-2.4-6.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.9 11.4c0 3.2-.2 5.9-.5 8.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
     cards: '<rect x="4.1" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="4.6" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.1" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.3" y="13.1" width="6.6" height="6.3" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    pair:  '<circle cx="8.8" cy="8.4" r="2.9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="15.6" cy="9.4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.9 18.8c.3-2.9 2.3-4.6 4.9-4.6 2.6 0 4.6 1.7 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.1 14.4c2.4 0 4.2 1.5 4.5 4.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    link:  '<path d="M10.4 13.8c1.3 1.4 3.2 1.4 4.5.1l2.7-2.7c1.3-1.3 1.3-3.3 0-4.6-1.3-1.3-3.3-1.3-4.6 0l-1.5 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.6 10.3c-1.3-1.4-3.2-1.4-4.5-.1l-2.7 2.7c-1.3 1.3-1.3 3.3 0 4.6 1.3 1.3 3.3 1.3 4.6 0l1.5-1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    note:  '<rect x="3.8" y="5.6" width="16.4" height="12.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.4 6.8c2.9 2.4 5.4 4.3 7.6 5.6 2.2-1.3 4.7-3.2 7.6-5.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
     redo:  '<path d="M19 7.4c-1.6-1.7-3.9-2.7-6.4-2.7-4.5 0-8.1 3.4-8.1 7.7s3.6 7.7 8.1 7.7c3.6 0 6.7-2.2 7.7-5.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13.6 7.1c2-.1 3.7-.2 5.3-.2.1 1.6.1 3.3 0 5.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
     warn:  '<path d="M11 4.9c.5-.8 1.5-.8 2 0l7.2 12.6c.5.9 0 1.9-1 1.9H4.8c-1 0-1.5-1-1-1.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9.4v3.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16.1" r="1.05" fill="currentColor"/>',
     label: '<path d="M5 10.4c.1-2 .3-3.8.6-5.4 1.7-.3 3.5-.5 5.4-.6l7.7 7.7c.6.6.6 1.6 0 2.2l-3.8 3.8c-.6.6-1.6.6-2.2 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8.5" cy="8.3" r="1.25" fill="currentColor"/>',
@@ -742,6 +841,7 @@ function visible(){
   if (q) list = list.filter((it) => fold(it.title).includes(q) || fold(it.channel).includes(q));
   if (channel) list = list.filter((it) => it.channel === channel);
   if (tag) list = list.filter((it) => hasTag(it, tag));
+  if (together) list = list.filter((it) => it.togetherAt);
 
   // A time slot answers "what can I watch now". Searching or picking a channel
   // asks "where is that one video", so those switch the row to Everything
@@ -855,6 +955,7 @@ function renderControls(list){
 function card(it){
   const el = document.createElement("div");
   el.className = "card" + (isStale(it) ? " stale" : "") +
+    (it.togetherAt ? " together" : "") +
     (it.pinnedAt ? " pinned" : "") + (it.watchedAt ? " done" : "");
 
   const thumb = document.createElement("button");
@@ -897,6 +998,18 @@ function card(it){
     patch(it.id, { pin: !it.pinnedAt });
   };
   el.append(pin);
+
+  // Bottom-left: the only corner of the picture left, and the one the duration
+  // badge never uses.
+  const pair = document.createElement("button");
+  pair.className = "pair" + (it.togetherAt ? " on" : "");
+  pair.title = it.togetherAt ? "Not one to watch together after all" : "One to watch together";
+  pair.innerHTML = icon("pair", 15);
+  pair.onclick = (e) => {
+    e.stopPropagation();
+    patch(it.id, { together: !it.togetherAt });
+  };
+  el.append(pair);
 
   const pick = document.createElement("button");
   pick.className = "pick" + (picked.has(it.id) ? " on" : "");
@@ -1228,6 +1341,24 @@ function renderBulk(){
   };
   bar.append(rf);
 
+  const mk = document.createElement("button");
+  mk.innerHTML = icon("link", 15) + "<span>Make a link</span>";
+  mk.title = "One YouTube link that plays these in order";
+  mk.onclick = async () => {
+    const url = playlistLink(chosen);
+    if (!url){ toast("None of those are YouTube videos."); return; }
+    if (await copyText(url)){
+      toast("Link copied — it plays them in order.");
+    } else {
+      // Never leave him with nothing: mark them Together and show it in the bar.
+      await patchMany(ids, { together: true });
+      together = true;
+      render();
+      toast("Marked them Together — the link is in the purple bar.");
+    }
+  };
+  bar.append(mk);
+
   const sp = document.createElement("span");
   sp.style.flex = "1";
   bar.append(sp);
@@ -1238,9 +1369,88 @@ function renderBulk(){
   bar.append(c);
 }
 
+function renderPair(){
+  const marked = items.filter((it) => it.togetherAt && !it.watchedAt);
+  const btn = $("pairbtn");
+  const bar = $("pairbar");
+
+  if (!marked.length && together) together = false;
+  btn.hidden = !marked.length;
+  if (marked.length){
+    btn.className = "pill pairpill" + (together ? " on" : "");
+    btn.innerHTML = `${icon("pair", 15)}<span class="n"> Together · ${marked.length}</span>`;
+    btn.style.display = "flex";
+    btn.style.alignItems = "center";
+    btn.style.gap = "5px";
+    btn.onclick = () => {
+      together = !together;
+      if (together){ showWatched = false; filter = "all"; }
+      render();
+    };
+  }
+
+  bar.hidden = !together || !marked.length;
+  if (bar.hidden) return;
+  bar.textContent = "";
+
+  const n = document.createElement("b");
+  n.textContent = `${marked.length} to watch together`;
+  bar.append(n);
+
+  const say = document.createElement("span");
+  say.style.fontSize = "13px";
+
+  const out = document.createElement("textarea");
+  out.className = "pairout";
+  out.hidden = true;
+  out.readOnly = true;
+
+  const offer = async (text, copied, plain) => {
+    out.hidden = false;
+    out.value = text;
+    out.rows = Math.min(12, text.split("\n").length + 1);
+    out.focus();
+    out.select();
+    say.textContent = (await copyText(text)) ? copied : plain;
+  };
+
+  const link = document.createElement("button");
+  link.innerHTML = icon("link", 15) + "<span>A link that plays them</span>";
+  link.onclick = () => {
+    const url = playlistLink(marked);
+    if (!url){ say.textContent = "None of these are YouTube videos."; return; }
+    offer(url, "Copied — it plays all of them, in order.", "Here it is — press ⌘C to copy it.");
+  };
+  bar.append(link);
+
+  const msg = document.createElement("button");
+  msg.innerHTML = icon("note", 15) + "<span>A message to send</span>";
+  msg.onclick = () =>
+    offer(
+      shortlistText(marked),
+      "Copied — paste it into Messages, WhatsApp, anywhere.",
+      "Here it is — press ⌘C to copy it."
+    );
+  bar.append(msg);
+
+  bar.append(say);
+
+  const sp = document.createElement("span");
+  sp.style.flex = "1";
+  bar.append(sp);
+
+  const off = document.createElement("button");
+  off.textContent = "Show everything";
+  off.onclick = () => { together = false; render(); };
+  bar.append(off);
+
+  bar.append(out);
+}
+
 function render(){
   const list = visible();
   renderControls(list);
+  renderPair();
   renderBulk();
   const g = $("grid");
   g.className = "grid" + (view === "compact" ? " compact" : "");
@@ -1258,6 +1468,7 @@ function render(){
     if (query.trim()) e.textContent = `Nothing matches “${query.trim()}”.`;
     else if (channel) e.textContent = `Nothing from ${channel} left to watch.`;
     else if (tag) e.textContent = `Nothing tagged ${tag} left to watch.`;
+    else if (together) e.textContent = "Nothing marked to watch together yet.";
     else if (showWatched) e.textContent = "Nothing ticked off yet.";
     else if (items.length) e.textContent = "Nothing that short on the list. Try a longer slot.";
     else e.textContent = "Paste a YouTube link above to start.";
